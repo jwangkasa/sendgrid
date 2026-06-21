@@ -129,9 +129,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         INSERT INTO RECIPIENT_LOGS (
           "ID", "FIRST_NAME", "LAST_NAME", "CATEGORY", "COMPANY",
           "EMAIL_ADDRESS", "PHONE_NUMBER", "COMMENTS",
-          "BATCH_ID", "DELIVERY_STATUS", "OPEN_COUNT", "CLICK_COUNT",
+          "BATCH_ID", "CAMPAIGN_NAME", "DELIVERY_STATUS", "OPEN_COUNT", "CLICK_COUNT",
           "CREATED_AT", "UPDATED_AT"
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', 0, 0, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', 0, 0, ?, ?)
       `.trim();
 
       const insertChunks = chunk(recipients, 500);
@@ -150,6 +150,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             toParam(r.PHONE_NUMBER),
             toParam(r.COMMENTS),
             batchId,
+            campaignName,
             now,
             now,
           ]);

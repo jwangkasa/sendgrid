@@ -17,6 +17,7 @@ export interface RecipientLog {
   PHONE_NUMBER: string | null;
   COMMENTS: string | null;
   BATCH_ID: string;
+  CAMPAIGN_NAME: string | null;
   SG_MESSAGE_ID: string | null;
   DELIVERY_STATUS: DeliveryStatus;
   OPEN_COUNT: number;

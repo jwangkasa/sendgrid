@@ -13,10 +13,10 @@ function isBatchComplete(data: MetricsResponseBody): boolean {
 }
 
 interface UseMetricsPollingOptions {
-  batchId:  string | null;
-  idToken:  string | null;
-  /** Polling interval in ms. Default: 3000 */
-  interval?: number;
+  batchId:      string | null;
+  idToken:      string | null;
+  interval?:    number;
+  overrideKey?: string | null;
 }
 
 export interface MetricsPollingResult {
@@ -33,6 +33,7 @@ export function useMetricsPolling({
   batchId,
   idToken,
   interval = 3000,
+  overrideKey,
 }: UseMetricsPollingOptions): MetricsPollingResult {
 
   const fetcher = useCallback(
@@ -55,9 +56,9 @@ export function useMetricsPolling({
     [idToken]
   );
 
-  const key = batchId && idToken
-    ? `/api/campaign/metrics?batchId=${encodeURIComponent(batchId)}`
-    : null;
+  const key = overrideKey
+    ? (idToken ? overrideKey : null)
+    : (batchId && idToken ? `/api/campaign/metrics?batchId=${encodeURIComponent(batchId)}` : null);
 
   const { data, error, isLoading, mutate } = useSWR<MetricsResponseBody>(
     key,

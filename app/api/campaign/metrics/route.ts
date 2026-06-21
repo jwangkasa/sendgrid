@@ -46,16 +46,18 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ message: 'Authentication error' }, { status: 401 });
   }
 
-  // ── 2. Validate batchId param ───────────────────────────────────────────────
+  // ── 2. Validate batchId param(s) ───────────────────────────────────────────
   const { searchParams } = new URL(req.url);
-  const batchId = searchParams.get('batchId')?.trim();
+  const batchIds = searchParams.getAll('batchId').flatMap((v) => v.split(',')).map((v) => v.trim()).filter(Boolean);
 
-  if (!batchId) {
+  if (batchIds.length === 0) {
     return NextResponse.json({ message: 'Missing required query parameter: batchId' }, { status: 400 });
   }
-  if (batchId.length > 50) {
+  if (batchIds.some((id) => id.length > 50)) {
     return NextResponse.json({ message: 'batchId exceeds maximum length of 50 characters' }, { status: 400 });
   }
+
+  const placeholders = batchIds.map(() => '?').join(', ');
 
   // ── 3. Run aggregate + row-list queries concurrently ────────────────────────
   let aggregateRows: StatusCount[];
@@ -63,7 +65,6 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   try {
     const [aggregateResult, recipientResult] = await Promise.all([
-      // Aggregate: one row per DELIVERY_STATUS with sum of counters
       query<StatusCount>(
         `SELECT
            "DELIVERY_STATUS",
@@ -71,12 +72,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
            SUM("OPEN_COUNT")      AS "TOTAL_OPENS",
            SUM("CLICK_COUNT")     AS "TOTAL_CLICKS"
          FROM RECIPIENT_LOGS
-         WHERE "BATCH_ID" = ?
+         WHERE "BATCH_ID" IN (${placeholders})
          GROUP BY "DELIVERY_STATUS"`,
-        [batchId]
+        batchIds
       ),
-
-      // Full row list for table rendering — most recently updated first
       query<RecipientLog>(
         `SELECT
            "ID",
@@ -88,6 +87,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
            "PHONE_NUMBER",
            "COMMENTS",
            "BATCH_ID",
+           "CAMPAIGN_NAME",
            "SG_MESSAGE_ID",
            "DELIVERY_STATUS",
            "OPEN_COUNT",
@@ -96,9 +96,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
            TO_VARCHAR("CREATED_AT", 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS "CREATED_AT",
            TO_VARCHAR("UPDATED_AT", 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS "UPDATED_AT"
          FROM RECIPIENT_LOGS
-         WHERE "BATCH_ID" = ?
+         WHERE "BATCH_ID" IN (${placeholders})
          ORDER BY "UPDATED_AT" DESC`,
-        [batchId]
+        batchIds
       ),
     ]);
 
@@ -138,7 +138,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     denom === 0 ? 0 : Math.round((num / denom) * 10000) / 100;
 
   const body: MetricsResponseBody = {
-    batchId,
+    batchId: batchIds.join(','),
     total,
     delivered,
     opened:       totalOpens,   // sum of OPEN_COUNT (counts multiple opens)
