@@ -66,10 +66,6 @@ export function buildPersonalization(
   return {
     to: [{ email: recipient.EMAIL_ADDRESS, name: displayName }],
     subject: interpolate(subjectTemplate, recipient),
-    custom_args: {
-      batch_id: batchId,
-      email:    recipient.EMAIL_ADDRESS,
-    },
   };
 }
 
@@ -123,6 +119,10 @@ export async function sendPersonalizedBatch(
         from: { email: fromEmail, name: fromName },
         personalizations: [buildPersonalization(r, batchId, template.subject)],
         content: rawContent,
+        custom_args: {
+          batch_id: batchId,
+          email:    r.EMAIL_ADDRESS,
+        },
         trackingSettings: {
           clickTracking: { enable: true, enableText: false },
           openTracking:  { enable: true },
