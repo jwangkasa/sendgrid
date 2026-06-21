@@ -10,7 +10,8 @@ import {
 } from 'react';
 import {
   GoogleAuthProvider,
-  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signOut as firebaseSignOut,
   onAuthStateChanged,
   type User,
@@ -34,6 +35,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [idToken, setIdToken]     = useState<string | null>(null);
   const [loading, setLoading]     = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Handle redirect result after Google sign-in
+    getRedirectResult(firebaseAuth).catch(() => {});
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(firebaseAuth, async (firebaseUser) => {
@@ -77,12 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithGoogle = useCallback(async () => {
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
-    try {
-      await signInWithPopup(firebaseAuth, provider);
-    } catch (err: unknown) {
-      if ((err as { code?: string })?.code === 'auth/cancelled-popup-request') return;
-      throw err;
-    }
+    await signInWithRedirect(firebaseAuth, provider);
   }, []);
 
   const signOut = useCallback(async () => {
