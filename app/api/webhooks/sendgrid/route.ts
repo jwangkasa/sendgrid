@@ -50,7 +50,7 @@ function verifySignature(
 ): boolean {
   try {
     const ew = new EventWebhook();
-    const ecPublicKey = ew.convertPublicKeyToECDH(publicKey);
+    const ecPublicKey = ew.convertPublicKeyToECDSA(publicKey);
     return ew.verifySignature(ecPublicKey, payload, signature, timestamp);
   } catch {
     return false;

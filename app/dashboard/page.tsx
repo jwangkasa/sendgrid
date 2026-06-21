@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMetricsPolling } from './components/useMetricsPolling';
@@ -82,7 +82,7 @@ function SkeletonTable() {
 
 // ─── Dashboard page ───────────────────────────────────────────────────────────
 
-export default function DashboardPage() {
+function DashboardContent() {
   const { user, loading: authLoading, idToken, signOut } = useAuth();
   const router       = useRouter();
   const searchParams = useSearchParams();
@@ -347,5 +347,17 @@ export default function DashboardPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <DashboardContent />
+    </Suspense>
   );
 }
