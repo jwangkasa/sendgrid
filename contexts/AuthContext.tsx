@@ -12,6 +12,7 @@ import {
   GoogleAuthProvider,
   signInWithRedirect,
   getRedirectResult,
+  signInWithEmailAndPassword,
   signOut as firebaseSignOut,
   onAuthStateChanged,
   type User,
@@ -25,6 +26,7 @@ interface AuthContextValue {
   idToken: string | null;
   authError: string | null;
   signInWithGoogle: () => Promise<void>;
+  signInWithEmail: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -80,6 +82,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(interval);
   }, [user]);
 
+  const signInWithEmail = useCallback(async (email: string, password: string) => {
+    setAuthError(null);
+    try {
+      await signInWithEmailAndPassword(firebaseAuth, email, password);
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code;
+      if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') {
+        setAuthError('Invalid email or password.');
+      } else if (code === 'auth/too-many-requests') {
+        setAuthError('Too many attempts. Please try again later.');
+      } else {
+        setAuthError('Sign-in failed. Please try again.');
+      }
+    }
+  }, []);
+
   const signInWithGoogle = useCallback(async () => {
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
@@ -92,7 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, idToken, authError, signInWithGoogle, signOut }}>
+    <AuthContext.Provider value={{ user, loading, idToken, authError, signInWithGoogle, signInWithEmail, signOut }}>
       {children}
     </AuthContext.Provider>
   );
