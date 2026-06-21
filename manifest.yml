@@ -1,0 +1,15 @@
+---
+applications:
+  - name: bulk-email-engine
+    memory: 512M
+    disk_quota: 1G
+    instances: 1
+    buildpacks:
+      - nodejs_buildpack
+    command: node .next/standalone/server.js
+    health-check-type: http
+    health-check-http-endpoint: /api/health
+    env:
+      NODE_ENV: production
+      PORT: 8080
+      NEXT_TELEMETRY_DISABLED: 1
