@@ -141,7 +141,9 @@ export async function sendPersonalizedBatch(
 
       console.log(`[sendgrid] sending to ${r.EMAIL_ADDRESS} batchId=${batchId}`);
       const statusCode = await sendRaw(message);
-      console.log(`[sendgrid] response ${statusCode} for ${r.EMAIL_ADDRESS}`);
+      if (statusCode < 200 || statusCode >= 300) {
+        console.error(`[sendgrid] unexpected status ${statusCode} for ${r.EMAIL_ADDRESS}`);
+      }
       return statusCode;
     })
   );

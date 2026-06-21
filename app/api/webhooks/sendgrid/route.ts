@@ -114,12 +114,7 @@ async function processEvent(event: SendGridWebhookEvent): Promise<void> {
   const eventType = event.event;
   const action    = EVENT_ACTIONS[eventType];
 
-  console.log(`[webhook] processEvent: type=${eventType} email=${email} batchId=${batchId} hasAction=${!!action}`);
-
-  if (!batchId || !email || !action) {
-    console.warn(`[webhook] skipping event — missing: batchId=${!batchId} email=${!email} action=${!action}`);
-    return;
-  }
+  if (!batchId || !email || !action) return;
 
   // Convert Unix epoch seconds → ISO timestamp string for HANA TIMESTAMP comparison
   const eventTs = new Date(event.timestamp * 1000).toISOString();
@@ -186,7 +181,6 @@ async function processEvent(event: SendGridWebhookEvent): Promise<void> {
   `.trim();
 
   await execute(sql, params);
-  console.log(`[webhook] HANA updated: event=${eventType} email=${email} batchId=${batchId}`);
 
   // Mirror to Firestore — non-fatal if the campaign doc doesn't exist
   try {
@@ -214,32 +208,24 @@ async function processEvent(event: SendGridWebhookEvent): Promise<void> {
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  // ── 1. Read raw body bytes ──────────────────────────────────────────────────
   const rawBody = Buffer.from(await req.arrayBuffer());
-  console.log('[webhook] POST received, body size:', rawBody.length);
 
-  // ── 2. Signature verification ───────────────────────────────────────────────
   const publicKey = process.env.SENDGRID_WEBHOOK_PUBLIC_KEY ?? '';
   if (!publicKey) {
     console.error('[webhook] SENDGRID_WEBHOOK_PUBLIC_KEY is not set');
     if (process.env.NODE_ENV === 'production') {
       return NextResponse.json({ message: 'Webhook not configured' }, { status: 500 });
     }
-    console.warn('[webhook] Skipping signature verification — dev mode');
   } else {
     const signature = req.headers.get(EventWebhookHeader.SIGNATURE()) ?? '';
     const timestamp = req.headers.get(EventWebhookHeader.TIMESTAMP())  ?? '';
-    console.log('[webhook] signature present:', !!signature, '| timestamp present:', !!timestamp);
 
     if (!signature || !timestamp) {
-      console.warn('[webhook] Missing signature headers');
       return NextResponse.json({ message: 'Missing webhook signature headers' }, { status: 400 });
     }
 
     const valid = verifySignature(publicKey, rawBody, signature, timestamp);
-    console.log('[webhook] signature valid:', valid);
     if (!valid) {
-      console.warn('[webhook] Invalid SendGrid signature — rejecting payload');
       return NextResponse.json({ message: 'Invalid signature' }, { status: 403 });
     }
   }
@@ -249,8 +235,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
     events = JSON.parse(rawBody.toString('utf-8')) as SendGridWebhookEvent[];
     if (!Array.isArray(events)) throw new Error('Payload is not an array');
-    console.log(`[webhook] parsed ${events.length} events:`, events.map((e) => `${e.event}:${e.email}`).join(', '));
-    console.log('[webhook] raw first event:', JSON.stringify(events[0]));
   } catch (err) {
     console.error('[webhook] JSON parse error:', err);
     return NextResponse.json({ message: 'Invalid JSON payload' }, { status: 400 });
