@@ -114,7 +114,12 @@ async function processEvent(event: SendGridWebhookEvent): Promise<void> {
   const eventType = event.event;
   const action    = EVENT_ACTIONS[eventType];
 
-  if (!batchId || !email || !action) return;
+  console.log(`[webhook] processEvent: type=${eventType} email=${email} batchId=${batchId} hasAction=${!!action}`);
+
+  if (!batchId || !email || !action) {
+    console.warn(`[webhook] skipping event — missing: batchId=${!batchId} email=${!email} action=${!action}`);
+    return;
+  }
 
   // Convert Unix epoch seconds → ISO timestamp string for HANA TIMESTAMP comparison
   const eventTs = new Date(event.timestamp * 1000).toISOString();
