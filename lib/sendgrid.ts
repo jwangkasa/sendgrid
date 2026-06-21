@@ -30,6 +30,10 @@ async function sendRaw(payload: unknown): Promise<number> {
     },
     body: JSON.stringify(payload),
   });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    console.error(`[sendgrid] HTTP ${res.status}: ${body}`);
+  }
   return res.status;
 }
 
@@ -125,20 +129,19 @@ export async function sendPersonalizedBatch(
         from: { email: fromEmail, name: fromName },
         personalizations: [buildPersonalization(r, batchId, template.subject)],
         content: rawContent,
-        // Use snake_case key directly — the SDK excludes 'customArgs' from its
-        // toSnakeCase conversion, so camelCase is silently dropped by the API.
-        // eslint-disable-next-line @typescript-eslint/naming-convention
         custom_args: {
           batch_id: batchId,
           email:    r.EMAIL_ADDRESS,
         },
-        trackingSettings: {
-          clickTracking: { enable: true, enableText: false },
-          openTracking:  { enable: true },
+        tracking_settings: {
+          click_tracking:  { enable: true, enable_text: false },
+          open_tracking:   { enable: true },
         },
       };
 
+      console.log(`[sendgrid] sending to ${r.EMAIL_ADDRESS} batchId=${batchId}`);
       const statusCode = await sendRaw(message);
+      console.log(`[sendgrid] response ${statusCode} for ${r.EMAIL_ADDRESS}`);
       return statusCode;
     })
   );
