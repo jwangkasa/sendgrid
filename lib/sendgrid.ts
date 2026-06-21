@@ -119,17 +119,14 @@ export async function sendPersonalizedBatch(
           return [{ type: 'text/plain', value: ' ' }];
         })();
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const message = {
         from: { email: fromEmail, name: fromName },
         personalizations: [buildPersonalization(r, batchId, template.subject)],
-        to: [{ email: fromEmail }],
         content: rawContent,
         trackingSettings: {
           clickTracking: { enable: true, enableText: false },
           openTracking:  { enable: true },
         },
-        customArgs: { batch_id: batchId },
       };
 
       const [response] = await client.send(message as unknown as Parameters<typeof client.send>[0]);
