@@ -109,7 +109,7 @@ const EVENT_ACTIONS: Partial<Record<SendGridEventType, EventAction>> = {
 // regress state due to out-of-order delivery.
 
 async function processEvent(event: SendGridWebhookEvent): Promise<void> {
-  const batchId   = event.custom_args?.batch_id;
+  const batchId   = event.batch_id ?? event.custom_args?.batch_id;
   const email     = event.email ?? event.custom_args?.email;
   const eventType = event.event;
   const action    = EVENT_ACTIONS[eventType];

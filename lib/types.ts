@@ -137,6 +137,7 @@ export interface SendGridWebhookEvent {
   sg_message_id?: string;
   reason?: string;
   url?: string;
+  batch_id?: string;
   custom_args?: {
     batch_id?: string;
     email?: string;
