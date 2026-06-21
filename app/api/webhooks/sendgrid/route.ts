@@ -250,6 +250,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     events = JSON.parse(rawBody.toString('utf-8')) as SendGridWebhookEvent[];
     if (!Array.isArray(events)) throw new Error('Payload is not an array');
     console.log(`[webhook] parsed ${events.length} events:`, events.map((e) => `${e.event}:${e.email}`).join(', '));
+    console.log('[webhook] raw first event:', JSON.stringify(events[0]));
   } catch (err) {
     console.error('[webhook] JSON parse error:', err);
     return NextResponse.json({ message: 'Invalid JSON payload' }, { status: 400 });
