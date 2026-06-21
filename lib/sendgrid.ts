@@ -11,26 +11,34 @@
  * responses so the dispatch route can abort its transaction.
  */
 
-import sgMail from '@sendgrid/mail';
-import type { MailDataRequired } from '@sendgrid/mail';
 import type { RecipientRow, EmailTemplate } from '@/lib/types';
 
 // ─── Initialisation ───────────────────────────────────────────────────────────
 
-function getSendGridClient(): typeof sgMail {
+function getSendGridApiKey(): string {
   const apiKey = process.env.SENDGRID_API_KEY;
   if (!apiKey) throw new Error('Missing SENDGRID_API_KEY environment variable');
-  sgMail.setApiKey(apiKey);
-  return sgMail;
+  return apiKey;
+}
+
+async function sendRaw(payload: unknown): Promise<number> {
+  const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${getSendGridApiKey()}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  return res.status;
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface Personalization {
-  to:           { email: string; name?: string }[];
-  subject?:     string;
+  to:      { email: string; name?: string }[];
+  subject?: string;
   dynamic_template_data?: Record<string, string>;
-  custom_args:  { batch_id: string; email: string; [key: string]: string };
 }
 
 export interface BatchSendResult {
@@ -92,8 +100,6 @@ export async function sendPersonalizedBatch(
     );
   }
 
-  const client = getSendGridClient();
-
   const fromEmail = process.env.SENDGRID_FROM_EMAIL;
   const fromName  = process.env.SENDGRID_FROM_NAME ?? '';
   if (!fromEmail) throw new Error('Missing SENDGRID_FROM_EMAIL environment variable');
@@ -119,6 +125,9 @@ export async function sendPersonalizedBatch(
         from: { email: fromEmail, name: fromName },
         personalizations: [buildPersonalization(r, batchId, template.subject)],
         content: rawContent,
+        // Use snake_case key directly — the SDK excludes 'customArgs' from its
+        // toSnakeCase conversion, so camelCase is silently dropped by the API.
+        // eslint-disable-next-line @typescript-eslint/naming-convention
         custom_args: {
           batch_id: batchId,
           email:    r.EMAIL_ADDRESS,
@@ -129,8 +138,8 @@ export async function sendPersonalizedBatch(
         },
       };
 
-      const [response] = await client.send(message as unknown as Parameters<typeof client.send>[0]);
-      return response.statusCode;
+      const statusCode = await sendRaw(message);
+      return statusCode;
     })
   );
 
