@@ -110,17 +110,21 @@ export async function sendPersonalizedBatch(
       const htmlBody = interpolate(template.htmlBody, r);
       const textBody = interpolate(template.textBody, r);
 
-      const message: MailDataRequired = {
+      const rawContent = (() => {
+          if (htmlBody.trim() && textBody.trim()) {
+            return [{ type: 'text/html', value: htmlBody }, { type: 'text/plain', value: textBody }];
+          }
+          if (htmlBody.trim()) return [{ type: 'text/html',  value: htmlBody }];
+          if (textBody.trim()) return [{ type: 'text/plain', value: textBody }];
+          return [{ type: 'text/plain', value: ' ' }];
+        })();
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const message = {
         from: { email: fromEmail, name: fromName },
         personalizations: [buildPersonalization(r, batchId, template.subject)],
         to: [{ email: fromEmail }],
-        content: [
-          ...(htmlBody.trim() ? [{ type: 'text/html',  value: htmlBody }] : []),
-          ...(textBody.trim() ? [{ type: 'text/plain', value: textBody }] : []),
-          ...(htmlBody.trim() === '' && textBody.trim() === ''
-            ? [{ type: 'text/plain', value: ' ' }]
-            : []),
-        ],
+        content: rawContent,
         trackingSettings: {
           clickTracking: { enable: true, enableText: false },
           openTracking:  { enable: true },
@@ -128,7 +132,7 @@ export async function sendPersonalizedBatch(
         customArgs: { batch_id: batchId },
       };
 
-      const [response] = await client.send(message as Parameters<typeof client.send>[0]);
+      const [response] = await client.send(message as unknown as Parameters<typeof client.send>[0]);
       return response.statusCode;
     })
   );

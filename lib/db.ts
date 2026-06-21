@@ -16,7 +16,8 @@
  *   HANA_POOL_MAX    — maximum connections (default 10)
  */
 
-import hdb from 'hdb';
+// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any
+const hdb: any = require('hdb');
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
