@@ -78,7 +78,7 @@ export default function CampaignPage() {
         setDispatching(false);
       }
     },
-    [idToken, recipients, template, router]
+    [idToken, campaignName, recipients, template, router]
   );
 
   useEffect(() => {
