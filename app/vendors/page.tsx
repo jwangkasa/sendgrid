@@ -31,11 +31,13 @@ export interface VendorFilters {
   industry:         string;
   lastModifiedFrom: string;
   lastModifiedTo:   string;
+  search:           string;
 }
 
 function buildVendorKey(page: number, filters: VendorFilters, idToken: string | null): string | null {
   if (!idToken) return null;
   const params = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) });
+  if (filters.search)           params.set('search',           filters.search);
   if (filters.category)         params.set('category',         filters.category);
   if (filters.industry)         params.set('industry',         filters.industry);
   if (filters.lastModifiedFrom) params.set('lastModifiedFrom', filters.lastModifiedFrom);
@@ -68,13 +70,13 @@ export default function VendorsPage() {
   const router = useRouter();
 
   const [page,         setPage]         = useState(1);
-  const [globalFilter, setGlobalFilter] = useState('');
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [filters,      setFilters]      = useState<VendorFilters>({
     category:         '',
     industry:         '',
     lastModifiedFrom: '',
     lastModifiedTo:   '',
+    search:           '',
   });
 
   useEffect(() => {
@@ -115,7 +117,7 @@ export default function VendorsPage() {
   }, []);
 
   const handleClearFilters = useCallback(() => {
-    setFilters({ category: '', industry: '', lastModifiedFrom: '', lastModifiedTo: '' });
+    setFilters({ category: '', industry: '', lastModifiedFrom: '', lastModifiedTo: '', search: '' });
     setPage(1);
     setRowSelection({});
   }, []);
@@ -223,13 +225,13 @@ export default function VendorsPage() {
               page={data.page}
               pageSize={data.pageSize}
               pageCount={data.pageCount}
-              globalFilter={globalFilter}
+              globalFilter={filters.search}
               rowSelection={rowSelection}
               idToken={idToken}
               filters={filters}
               filterOptions={filterOptions ?? { categories: [], industries: [] }}
               onPageChange={setPage}
-              onFilterChange={setGlobalFilter}
+              onFilterChange={(val) => handleFiltersChange({ search: val })}
               onFiltersChange={handleFiltersChange}
               onClearFilters={handleClearFilters}
               onRowSelectionChange={setRowSelection}

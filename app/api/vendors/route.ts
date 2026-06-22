@@ -45,11 +45,19 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const industry         = searchParams.get('industry')         ?? '';
   const lastModifiedFrom = searchParams.get('lastModifiedFrom') ?? '';  // YYYY-MM-DD
   const lastModifiedTo   = searchParams.get('lastModifiedTo')   ?? '';  // YYYY-MM-DD
+  const search           = (searchParams.get('search')          ?? '').trim();
 
   // Build WHERE clauses dynamically
   const conditions: string[]  = [];
   const filterParams: unknown[] = [];
 
+  if (search) {
+    const like = `%${search}%`;
+    conditions.push(
+      '(LOWER("Email") LIKE LOWER(?) OR LOWER("First Name") LIKE LOWER(?) OR LOWER("Last Name") LIKE LOWER(?) OR LOWER("Company Name") LIKE LOWER(?))'
+    );
+    filterParams.push(like, like, like, like);
+  }
   if (category) {
     conditions.push('"category" = ?');
     filterParams.push(category);

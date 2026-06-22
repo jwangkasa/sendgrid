@@ -4,7 +4,6 @@ import { useMemo, useState, useCallback, useRef } from 'react';
 import {
   useReactTable,
   getCoreRowModel,
-  getFilteredRowModel,
   getPaginationRowModel,
   createColumnHelper,
   flexRender,
@@ -494,7 +493,6 @@ export function VendorTable({
     data,
     columns,
     state: {
-      globalFilter,
       rowSelection,
       pagination: { pageIndex: 0, pageSize },
     },
@@ -505,11 +503,8 @@ export function VendorTable({
         typeof updater === 'function' ? updater(rowSelection) : updater
       );
     },
-    onGlobalFilterChange: onFilterChange,
     getCoreRowModel:       getCoreRowModel(),
-    getFilteredRowModel:   getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
-    globalFilterFn:        'includesString',
     manualPagination:      true,
     pageCount,
   });
@@ -518,6 +513,7 @@ export function VendorTable({
   const anyEditing    = editState !== null;
 
   const activeFilterCount = [
+    globalFilter,
     filters.category,
     filters.industry,
     filters.lastModifiedFrom,
