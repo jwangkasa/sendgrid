@@ -109,6 +109,9 @@ export async function sendPersonalizedBatch(
   const fromName  = template.fromName  || process.env.SENDGRID_FROM_NAME || '';
   if (!fromEmail) throw new Error('Missing sender email — set fromEmail on the template or SENDGRID_FROM_EMAIL env var');
 
+  const replyToEmail = process.env.SENDGRID_REPLY_TO_EMAIL ?? 'vendors@hatchevent.com';
+  const replyToName  = process.env.SENDGRID_REPLY_TO_NAME  ?? '';
+
   // Interpolate body per recipient server-side — SendGrid's substitutions map
   // is unreliable with the v3 non-template API, so we resolve tokens here and
   // send one API call per recipient.
@@ -128,6 +131,7 @@ export async function sendPersonalizedBatch(
 
       const message = {
         from: { email: fromEmail, name: fromName },
+        reply_to: { email: replyToEmail, ...(replyToName ? { name: replyToName } : {}) },
         personalizations: [buildPersonalization(r, batchId, template.subject)],
         content: rawContent,
         custom_args: {
