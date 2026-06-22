@@ -20,9 +20,11 @@ export default function CampaignPage() {
   const [completedSteps, setCompletedSteps] = useState<Set<WizardStep>>(new Set());
   const [campaignName, setCampaignName]     = useState('');
   const [template, setTemplate]             = useState<EmailTemplate>({
-    subject:  '',
-    htmlBody: '',
-    textBody: '',
+    subject:   '',
+    htmlBody:  '',
+    textBody:  '',
+    fromEmail: '',
+    fromName:  '',
   });
   const [dispatching, setDispatching]       = useState(false);
   const [dispatchError, setDispatchError]   = useState<string | null>(null);
@@ -202,6 +204,7 @@ export default function CampaignPage() {
             <StepTemplateComposer
               initialTemplate={template}
               recipientCount={count}
+              idToken={idToken}
               onComplete={handleTemplateComplete}
               onBack={() => setCurrentStep('ingestion')}
             />

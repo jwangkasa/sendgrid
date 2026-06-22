@@ -1,13 +1,15 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { EmailTemplate } from '@/lib/types';
+import type { SenderOption } from '@/app/api/campaign/senders/route';
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
   ClipboardCopyIcon,
   CheckIcon,
   InfoIcon,
+  UserIcon,
 } from 'lucide-react';
 
 // Token catalogue — maps to HANA column names used in interpolation
@@ -89,6 +91,7 @@ function TokenChip({ token, onClick, usedIn }: TokenChipProps) {
 interface StepTemplateComposerProps {
   initialTemplate: EmailTemplate;
   recipientCount: number;
+  idToken: string | null;
   onComplete: (template: EmailTemplate) => void;
   onBack: () => void;
 }
@@ -96,13 +99,38 @@ interface StepTemplateComposerProps {
 export function StepTemplateComposer({
   initialTemplate,
   recipientCount,
+  idToken,
   onComplete,
   onBack,
 }: StepTemplateComposerProps) {
-  const [subject,  setSubject]  = useState(initialTemplate.subject);
-  const [htmlBody, setHtmlBody] = useState(initialTemplate.htmlBody);
-  const [textBody, setTextBody] = useState(initialTemplate.textBody);
+  const [subject,   setSubject]   = useState(initialTemplate.subject);
+  const [htmlBody,  setHtmlBody]  = useState(initialTemplate.htmlBody);
+  const [textBody,  setTextBody]  = useState(initialTemplate.textBody);
+  const [fromEmail, setFromEmail] = useState(initialTemplate.fromEmail);
+  const [fromName,  setFromName]  = useState(initialTemplate.fromName);
   const [activeTab, setActiveTab] = useState<'html' | 'text'>('html');
+
+  const [senders,       setSenders]       = useState<SenderOption[]>([]);
+  const [sendersLoading, setSendersLoading] = useState(true);
+
+  useEffect(() => {
+    if (!idToken) return;
+    fetch('/api/campaign/senders', {
+      headers: { Authorization: `Bearer ${idToken}` },
+    })
+      .then((r) => r.json())
+      .then((data: { senders: SenderOption[] }) => {
+        setSenders(data.senders ?? []);
+        // Auto-select first sender if none chosen yet
+        if (!fromEmail && data.senders?.[0]) {
+          setFromEmail(data.senders[0].email);
+          setFromName(data.senders[0].name ?? '');
+        }
+      })
+      .catch(() => {/* non-fatal */})
+      .finally(() => setSendersLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idToken]);
 
   // Derived analysis
   const activeBody       = activeTab === 'html' ? htmlBody : textBody;
@@ -128,11 +156,12 @@ export function StepTemplateComposer({
   const canProceed =
     subject.trim().length > 0 &&
     (htmlBody.trim().length > 0 || textBody.trim().length > 0) &&
-    unknownTokens.length === 0;
+    unknownTokens.length === 0 &&
+    fromEmail.trim().length > 0;
 
   const handleContinue = () => {
     if (canProceed) {
-      onComplete({ subject, htmlBody, textBody });
+      onComplete({ subject, htmlBody, textBody, fromEmail, fromName });
     }
   };
 
@@ -147,6 +176,40 @@ export function StepTemplateComposer({
               Compose your message. Insert tokens from the panel on the right — they'll be
               substituted per recipient at dispatch time.
             </p>
+          </div>
+
+          {/* Sender */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-gray-600 uppercase tracking-wider flex items-center gap-1.5">
+              <UserIcon className="w-3 h-3" />
+              Send From
+            </label>
+            {sendersLoading ? (
+              <div className="h-10 rounded-lg bg-gray-100 animate-pulse w-full" />
+            ) : senders.length === 0 ? (
+              <p className="text-xs text-red-500">
+                No verified senders found. Set <code className="font-mono bg-red-50 px-1 rounded">SENDGRID_VERIFIED_SENDERS</code> in your environment.
+              </p>
+            ) : (
+              <select
+                value={fromEmail}
+                onChange={(e) => {
+                  const picked = senders.find((s) => s.email === e.target.value);
+                  setFromEmail(e.target.value);
+                  setFromName(picked?.name ?? '');
+                }}
+                className="w-full px-3 py-2.5 rounded-lg bg-white border border-gray-300
+                           text-sm text-gray-900
+                           focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500
+                           transition-colors"
+              >
+                {senders.map((s) => (
+                  <option key={s.email} value={s.email}>
+                    {s.name ? `${s.name} <${s.email}>` : s.email}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
           {/* Subject line */}

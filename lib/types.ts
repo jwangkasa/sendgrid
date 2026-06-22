@@ -58,6 +58,8 @@ export interface EmailTemplate {
   subject:      string;
   htmlBody:     string;
   textBody:     string;
+  fromEmail:    string;
+  fromName:     string;
 }
 
 export type WizardStep = 'ingestion' | 'compose' | 'preview';

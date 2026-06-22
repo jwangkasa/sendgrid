@@ -38,9 +38,11 @@ const RecipientSchema = z.object({
 }).catchall(z.string());
 
 const TemplateSchema = z.object({
-  subject:  z.string().min(1, 'Subject line is required'),
-  htmlBody: z.string().default(''),
-  textBody: z.string().default(''),
+  subject:   z.string().min(1, 'Subject line is required'),
+  htmlBody:  z.string().default(''),
+  textBody:  z.string().default(''),
+  fromEmail: z.string().email('Invalid sender email').min(1, 'Sender email is required'),
+  fromName:  z.string().default(''),
 });
 
 const DispatchBodySchema = z.object({

@@ -161,6 +161,7 @@ export function StepPreview({
           recipients: [testRecipient],
           template,
           batchId: `TEST_${batchId}`,
+          campaignName: 'Test Send',
         }),
       });
       if (!res.ok) {
@@ -450,6 +451,12 @@ export function StepPreview({
               <div className="flex justify-between">
                 <span className="text-gray-500">Recipients</span>
                 <span className="text-gray-900 font-medium">{totalRows.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">From</span>
+                <span className="text-gray-700 max-w-[200px] truncate">
+                  {template.fromName ? `${template.fromName} <${template.fromEmail}>` : template.fromEmail}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Subject</span>

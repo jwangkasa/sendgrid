@@ -104,9 +104,10 @@ export async function sendPersonalizedBatch(
     );
   }
 
-  const fromEmail = process.env.SENDGRID_FROM_EMAIL;
-  const fromName  = process.env.SENDGRID_FROM_NAME ?? '';
-  if (!fromEmail) throw new Error('Missing SENDGRID_FROM_EMAIL environment variable');
+  // Prefer sender from template; fall back to env vars for backwards compatibility
+  const fromEmail = template.fromEmail || process.env.SENDGRID_FROM_EMAIL;
+  const fromName  = template.fromName  || process.env.SENDGRID_FROM_NAME || '';
+  if (!fromEmail) throw new Error('Missing sender email — set fromEmail on the template or SENDGRID_FROM_EMAIL env var');
 
   // Interpolate body per recipient server-side — SendGrid's substitutions map
   // is unreliable with the v3 non-template API, so we resolve tokens here and
