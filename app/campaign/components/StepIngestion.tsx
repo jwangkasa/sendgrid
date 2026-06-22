@@ -15,11 +15,11 @@ import {
 // Columns that MUST be present in the sheet (case-insensitive match)
 const REQUIRED_COLUMNS: (keyof RecipientRow)[] = [
   'EMAIL_ADDRESS',
-  'FIRST_NAME',
-  'LAST_NAME',
 ];
 
 const OPTIONAL_COLUMNS: (keyof RecipientRow)[] = [
+  'FIRST_NAME',
+  'LAST_NAME',
   'CATEGORY',
   'COMPANY',
   'PHONE_NUMBER',
@@ -182,10 +182,8 @@ export function StepIngestion({ onComplete }: StepIngestionProps) {
         <div>
           <h2 className="text-base font-semibold text-gray-900">Upload Recipient List</h2>
           <p className="text-sm text-gray-500 mt-0.5">
-            Drop an <code className="text-brand-600">.xlsx</code> file. Required columns:{' '}
-            <code className="text-brand-600">EMAIL_ADDRESS</code>,{' '}
-            <code className="text-brand-600">FIRST_NAME</code>,{' '}
-            <code className="text-brand-600">LAST_NAME</code>.
+            Drop an <code className="text-brand-600">.xlsx</code> file. Required column:{' '}
+            <code className="text-brand-600">EMAIL_ADDRESS</code>.
           </p>
         </div>
 
