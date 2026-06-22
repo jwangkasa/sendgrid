@@ -341,21 +341,39 @@ function DashboardContent() {
           />
         </div>
 
-        {/* Selected campaign chips */}
-        {selectedIds.size > 0 && selectedIds.size < batches.length && (
-          <div className="flex flex-wrap gap-2">
-            {Array.from(selectedIds).map((id) => {
-              const b = batches.find((b) => b.batchId === id);
-              return (
-                <span key={id} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full
-                                          bg-brand-50 border border-brand-200 text-brand-700 text-xs font-medium">
-                  {b?.campaignName ?? id}
-                  <button onClick={() => toggleBatch(id)} className="text-brand-400 hover:text-brand-700">
-                    <XIcon className="w-3 h-3" />
-                  </button>
-                </span>
-              );
-            })}
+        {/* Selected campaign chips + unselect all */}
+        {selectedIds.size > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            {selectedIds.size === batches.length ? (
+              <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full
+                               bg-brand-50 border border-brand-200 text-brand-700 text-xs font-medium">
+                All {batches.length} campaigns
+                <button onClick={clearAll} title="Unselect all" className="text-brand-400 hover:text-brand-700">
+                  <XIcon className="w-3 h-3" />
+                </button>
+              </span>
+            ) : (
+              <>
+                {Array.from(selectedIds).map((id) => {
+                  const b = batches.find((b) => b.batchId === id);
+                  return (
+                    <span key={id} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full
+                                              bg-brand-50 border border-brand-200 text-brand-700 text-xs font-medium">
+                      {b?.campaignName ?? id}
+                      <button onClick={() => toggleBatch(id)} className="text-brand-400 hover:text-brand-700">
+                        <XIcon className="w-3 h-3" />
+                      </button>
+                    </span>
+                  );
+                })}
+                <button
+                  onClick={clearAll}
+                  className="text-xs text-gray-400 hover:text-gray-700 underline underline-offset-2 transition-colors"
+                >
+                  Unselect all
+                </button>
+              </>
+            )}
           </div>
         )}
 
