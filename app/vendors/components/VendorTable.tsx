@@ -22,6 +22,7 @@ import {
   XIcon,
   LoaderIcon,
   SlidersHorizontalIcon,
+  PlusIcon,
 } from 'lucide-react';
 import type { VendorFilters } from '@/app/vendors/page';
 
@@ -78,6 +79,142 @@ function CellInput({ value, mono, onChange, onEnter, onEscape }: CellInputProps)
   );
 }
 
+// ─── Add Vendor Modal ─────────────────────────────────────────────────────────
+
+const EMPTY_FORM = {
+  'First Name': '', 'Last Name': '', 'Title': '', 'Company Name': '',
+  'Email': '', 'Corporate Phone': '', 'Industry': '', 'Website': '',
+  'Company Linkedin Url': '', 'Company Address': '', 'category': '',
+  'Personal LinkedIn': '', 'Industry/Service': '', 'Personal LinkedIn Url': '',
+} as const;
+
+type AddForm = typeof EMPTY_FORM & Record<string, string>;
+
+const ADD_FIELDS: { field: keyof typeof EMPTY_FORM; label: string; required?: boolean; mono?: boolean }[] = [
+  { field: 'First Name',           label: 'First Name' },
+  { field: 'Last Name',            label: 'Last Name' },
+  { field: 'Email',                label: 'Email',         required: true, mono: true },
+  { field: 'Company Name',         label: 'Company' },
+  { field: 'Title',                label: 'Title' },
+  { field: 'Corporate Phone',      label: 'Phone' },
+  { field: 'category',             label: 'Category' },
+  { field: 'Industry',             label: 'Industry' },
+  { field: 'Website',              label: 'Website',       mono: true },
+  { field: 'Company Address',      label: 'Company Address' },
+  { field: 'Company Linkedin Url', label: 'Company LinkedIn URL', mono: true },
+  { field: 'Personal LinkedIn',    label: 'Personal LinkedIn' },
+  { field: 'Industry/Service',     label: 'Industry / Service' },
+  { field: 'Personal LinkedIn Url',label: 'Personal LinkedIn URL', mono: true },
+];
+
+interface AddVendorModalProps {
+  idToken:  string | null;
+  onSaved:  () => void;
+  onClose:  () => void;
+}
+
+function AddVendorModal({ idToken, onSaved, onClose }: AddVendorModalProps) {
+  const [form,    setForm]    = useState<AddForm>({ ...EMPTY_FORM });
+  const [saving,  setSaving]  = useState(false);
+  const [error,   setError]   = useState<string | null>(null);
+
+  const update = (field: string, value: string) =>
+    setForm((prev) => ({ ...prev, [field]: value }));
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!idToken) return;
+    if (!form['Email'].trim()) { setError('Email is required.'); return; }
+
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/vendors', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify(form),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ message: res.statusText }));
+        throw new Error(body.message ?? 'Save failed');
+      }
+      onSaved();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Save failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <h2 className="text-base font-semibold text-gray-900">Add New Vendor</h2>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors">
+            <XIcon className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {ADD_FIELDS.map(({ field, label, required, mono }) => (
+              <div key={field} className={`flex flex-col gap-1 ${field === 'Company Address' ? 'sm:col-span-2' : ''}`}>
+                <label className="text-xs font-medium text-gray-600">
+                  {label}
+                  {required && <span className="text-red-500 ml-0.5">*</span>}
+                </label>
+                <input
+                  type={field === 'Email' ? 'email' : 'text'}
+                  value={form[field]}
+                  onChange={(e) => update(field, e.target.value)}
+                  required={required}
+                  className={`px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm text-gray-900
+                             placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500
+                             focus:border-brand-500 transition-colors ${mono ? 'font-mono' : ''}`}
+                />
+              </div>
+            ))}
+          </div>
+
+          {error && (
+            <div className="mt-4 flex items-center gap-2 p-3 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700">
+              <XIcon className="w-3.5 h-3.5 flex-shrink-0" />
+              {error}
+            </div>
+          )}
+        </form>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            className="px-4 py-2 rounded-lg border border-gray-300 text-gray-500 hover:text-gray-900
+                       hover:border-gray-400 text-sm transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={saving || !form['Email'].trim()}
+            className="flex items-center gap-2 px-5 py-2 rounded-lg bg-brand-600 hover:bg-brand-500
+                       disabled:bg-gray-200 disabled:text-gray-400 text-white text-sm font-semibold
+                       transition-colors shadow-sm disabled:shadow-none disabled:cursor-not-allowed"
+          >
+            {saving ? <LoaderIcon className="w-3.5 h-3.5 animate-spin" /> : <PlusIcon className="w-3.5 h-3.5" />}
+            {saving ? 'Saving…' : 'Add Vendor'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Column helper ────────────────────────────────────────────────────────────
 
 const columnHelper = createColumnHelper<VendorRow & { __rowKey: string }>();
@@ -121,7 +258,8 @@ export function VendorTable({
   onRowSelectionChange,
   onSaved,
 }: VendorTableProps) {
-  const [editState, setEditState] = useState<EditState | null>(null);
+  const [editState,    setEditState]    = useState<EditState | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
   const firstInputRef = useRef<HTMLInputElement | null>(null);
 
   // Attach stable row keys
@@ -496,16 +634,37 @@ export function VendorTable({
           />
         </div>
 
-        <span className="text-xs text-gray-400 flex-shrink-0">
-          {total.toLocaleString()} vendors
-          {selectedCount > 0 && !anyEditing && (
-            <span className="ml-1 font-semibold text-brand-600">· {selectedCount} selected</span>
-          )}
-          {anyEditing && (
-            <span className="ml-1 font-semibold text-amber-600">· editing row — save or cancel to continue</span>
-          )}
-        </span>
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <span className="text-xs text-gray-400">
+            {total.toLocaleString()} vendors
+            {selectedCount > 0 && !anyEditing && (
+              <span className="ml-1 font-semibold text-brand-600">· {selectedCount} selected</span>
+            )}
+            {anyEditing && (
+              <span className="ml-1 font-semibold text-amber-600">· editing row — save or cancel to continue</span>
+            )}
+          </span>
+
+          <button
+            onClick={() => setShowAddModal(true)}
+            disabled={anyEditing}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-brand-600 hover:bg-brand-500
+                       disabled:bg-gray-200 disabled:text-gray-400 text-white text-xs font-semibold
+                       transition-colors shadow-sm disabled:shadow-none disabled:cursor-not-allowed flex-shrink-0"
+          >
+            <PlusIcon className="w-3.5 h-3.5" />
+            Add Vendor
+          </button>
+        </div>
       </div>
+
+      {showAddModal && (
+        <AddVendorModal
+          idToken={idToken}
+          onSaved={() => { onSaved(); }}
+          onClose={() => setShowAddModal(false)}
+        />
+      )}
 
       {/* Inline edit error */}
       {editState?.error && (

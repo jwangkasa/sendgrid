@@ -128,6 +128,93 @@ const PatchSchema = z.object({
   }),
 });
 
+// ─── POST /api/vendors ────────────────────────────────────────────────────────
+// Body: all vendor fields; Email is required, rest optional
+
+const PostSchema = z.object({
+  'First Name':            z.string().optional().default(''),
+  'Last Name':             z.string().optional().default(''),
+  'Title':                 z.string().optional().default(''),
+  'Company Name':          z.string().optional().default(''),
+  'Email':                 z.string().email('Valid email is required'),
+  'Corporate Phone':       z.string().optional().default(''),
+  'Industry':              z.string().optional().default(''),
+  'Website':               z.string().optional().default(''),
+  'Company Linkedin Url':  z.string().optional().default(''),
+  'Company Address':       z.string().optional().default(''),
+  'category':              z.string().optional().default(''),
+  'Personal LinkedIn':     z.string().optional().default(''),
+  'Industry/Service':      z.string().optional().default(''),
+  'Personal LinkedIn Url': z.string().optional().default(''),
+});
+
+export async function POST(req: NextRequest): Promise<NextResponse> {
+  try {
+    await requireAuth(req);
+  } catch (err) {
+    if (err instanceof AuthError) {
+      return NextResponse.json({ message: err.message }, { status: err.statusCode });
+    }
+    return NextResponse.json({ message: 'Authentication error' }, { status: 401 });
+  }
+
+  let body: z.infer<typeof PostSchema>;
+  try {
+    body = PostSchema.parse(await req.json());
+  } catch (err) {
+    const message = err instanceof z.ZodError
+      ? err.errors.map((e) => `${e.path.join('.')}: ${e.message}`).join('; ')
+      : 'Invalid request body';
+    return NextResponse.json({ message }, { status: 400 });
+  }
+
+  // Check for duplicate email
+  const existing = await query<{ CNT: number }>(
+    `SELECT COUNT(*) AS "CNT" FROM "HATCH"."VENDOR" WHERE "Email" = ?`,
+    [body['Email']]
+  );
+  if (Number(existing.rows[0]?.CNT ?? 0) > 0) {
+    return NextResponse.json({ message: `A vendor with email ${body['Email']} already exists.` }, { status: 409 });
+  }
+
+  const now = new Date().toISOString().replace('T', ' ').replace('Z', '');
+  const v = (s: string) => s.trim() === '' ? null : s.trim();
+
+  try {
+    await execute(
+      `INSERT INTO "HATCH"."VENDOR" (
+        "First Name", "Last Name", "Title", "Company Name",
+        "Email", "Corporate Phone", "Industry", "Website",
+        "Company Linkedin Url", "Company Address", "category",
+        "Personal LinkedIn", "Industry/Service", "Personal LinkedIn Url",
+        "LAST_MODIFIED"
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        v(body['First Name']),
+        v(body['Last Name']),
+        v(body['Title']),
+        v(body['Company Name']),
+        body['Email'].trim(),
+        v(body['Corporate Phone']),
+        v(body['Industry']),
+        v(body['Website']),
+        v(body['Company Linkedin Url']),
+        v(body['Company Address']),
+        v(body['category']),
+        v(body['Personal LinkedIn']),
+        v(body['Industry/Service']),
+        v(body['Personal LinkedIn Url']),
+        now,
+      ]
+    );
+    return NextResponse.json({ ok: true }, { status: 201 });
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    console.error('[vendors] HANA INSERT error:', err);
+    return NextResponse.json({ message: `Database error: ${detail}` }, { status: 500 });
+  }
+}
+
 export async function PATCH(req: NextRequest): Promise<NextResponse> {
   try {
     await requireAuth(req);
