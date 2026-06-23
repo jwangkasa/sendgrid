@@ -89,11 +89,12 @@ interface BatchSelectorProps {
   batches:        BatchSummary[];
   selectedIds:    Set<string>;
   onToggle:       (id: string) => void;
+  onSelectOnly:   (id: string) => void;
   onSelectAll:    () => void;
   onClearAll:     () => void;
 }
 
-function BatchSelector({ batches, selectedIds, onToggle, onSelectAll, onClearAll }: BatchSelectorProps) {
+function BatchSelector({ batches, selectedIds, onToggle, onSelectOnly, onSelectAll, onClearAll }: BatchSelectorProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -151,18 +152,20 @@ function BatchSelector({ batches, selectedIds, onToggle, onSelectAll, onClearAll
               <p className="px-4 py-6 text-center text-xs text-gray-400">No campaigns found</p>
             ) : (
               batches.map((b) => (
-                <label
+                <div
                   key={b.batchId}
                   className="flex items-start gap-3 px-3 py-2.5 hover:bg-gray-50 cursor-pointer
-                             border-b border-gray-50 last:border-0"
+                             border-b border-gray-50 last:border-0 group"
+                  onClick={() => onSelectOnly(b.batchId)}
                 >
                   <input
                     type="checkbox"
                     checked={selectedIds.has(b.batchId)}
-                    onChange={() => onToggle(b.batchId)}
-                    className="w-3.5 h-3.5 rounded border-gray-300 text-brand-600 mt-0.5 flex-shrink-0"
+                    onChange={(e) => { e.stopPropagation(); onToggle(b.batchId); }}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-3.5 h-3.5 rounded border-gray-300 text-brand-600 mt-0.5 flex-shrink-0 cursor-pointer"
                   />
-                  <div className="flex flex-col gap-0.5 min-w-0">
+                  <div className="flex flex-col gap-0.5 min-w-0 flex-1">
                     <span className="text-xs font-semibold text-gray-800 truncate">{b.campaignName}</span>
                     <span className="text-[10px] text-gray-400 font-mono truncate">{b.batchId}</span>
                     <span className="text-[10px] text-gray-400">
@@ -170,7 +173,10 @@ function BatchSelector({ batches, selectedIds, onToggle, onSelectAll, onClearAll
                       {b.sentAt ? ` · ${new Date(b.sentAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}
                     </span>
                   </div>
-                </label>
+                  <span className="text-[10px] text-brand-500 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-0.5 font-medium">
+                    only
+                  </span>
+                </div>
               ))
             )}
           </div>
@@ -244,7 +250,7 @@ function DashboardContent() {
   });
 
   // ── Batch selector handlers ──────────────────────────────────────────────────
-  const toggleBatch = useCallback((id: string) => {
+  const toggleBatch   = useCallback((id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
@@ -252,8 +258,9 @@ function DashboardContent() {
     });
   }, []);
 
-  const selectAll  = useCallback(() => setSelectedIds(new Set(batches.map((b) => b.batchId))), [batches]);
-  const clearAll   = useCallback(() => setSelectedIds(new Set()), []);
+  const selectOnly  = useCallback((id: string) => setSelectedIds(new Set([id])), []);
+  const selectAll   = useCallback(() => setSelectedIds(new Set(batches.map((b) => b.batchId))), [batches]);
+  const clearAll    = useCallback(() => setSelectedIds(new Set()), []);
 
   const exportToExcel = useCallback(() => {
     if (!data?.rows.length) return;
@@ -369,6 +376,7 @@ function DashboardContent() {
             batches={batches}
             selectedIds={selectedIds}
             onToggle={toggleBatch}
+            onSelectOnly={selectOnly}
             onSelectAll={selectAll}
             onClearAll={clearAll}
           />
