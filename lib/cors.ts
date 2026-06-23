@@ -9,21 +9,25 @@ import { type NextRequest, NextResponse } from 'next/server';
  *
  * Logic:
  *  - No Origin header → same-origin or server-to-server → allow
- *  - Origin matches app URL → allow
- *  - Origin present but doesn't match → block with 403
+ *  - Origin host matches the request Host header → allow
+ *  - Origin present but host differs → block with 403
  *  - OPTIONS preflight from foreign origin → block with 405
  */
 export function assertSameOrigin(req: NextRequest): NextResponse | null {
   const origin = req.headers.get('origin');
   if (!origin) return null;
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
-  const host   = req.headers.get('host');
-  const allowed = appUrl
-    ? origin === appUrl || origin === appUrl.replace(/\/$/, '')
-    : (host ? origin.includes(host) : false);
+  // Extract just the host from the Origin header (strips protocol and trailing slash)
+  let originHost: string;
+  try {
+    originHost = new URL(origin).host;
+  } catch {
+    return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
+  }
 
-  if (!allowed) {
+  const requestHost = req.headers.get('host') ?? '';
+
+  if (originHost !== requestHost) {
     if (req.method === 'OPTIONS') {
       return new NextResponse(null, { status: 405 });
     }
