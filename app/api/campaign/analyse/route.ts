@@ -199,6 +199,9 @@ Generate the campaign summary and one follow-up email draft per segment. Set the
   // SAP AI Core: strip any trailing /v2 or slash from base URL, then add the full versioned path
   const apiBase = creds.baseUrl.replace(/\/v2\/?$/, '').replace(/\/$/, '');
   const chatUrl = `${apiBase}/v2/inference/deployments/${creds.deploymentId}/chat/completions`;
+  console.log('[analyse] chatUrl:', chatUrl);
+  console.log('[analyse] resourceGroup:', creds.resourceGroup);
+  console.log('[analyse] deploymentId:', creds.deploymentId);
 
   let aiRes: globalThis.Response;
   try {
