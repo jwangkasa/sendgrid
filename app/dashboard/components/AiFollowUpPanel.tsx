@@ -8,6 +8,7 @@ import {
   LoaderIcon,
   RocketIcon,
   UsersIcon,
+  ChevronDownIcon,
 } from 'lucide-react';
 import type { AiAnalysisResult, AiSegmentDraft, RecipientRow } from '@/lib/types';
 
@@ -20,6 +21,21 @@ const SEGMENT_LABELS: Record<SegmentKey, { label: string; color: string; dot: st
   failed:       { label: 'Failed',       color: 'text-red-700',     dot: 'bg-red-500'     },
 };
 
+const DEFAULT_PROMPT = `You are a B2B email marketing analyst. Analyse the campaign data provided and respond with ONLY a valid JSON object — no markdown, no explanation, no code fences. Use exactly this structure:
+{
+  "summary": "<2 paragraphs of plain-English campaign performance narrative>",
+  "segments": {
+    "engaged":      { "count": <number>, "subject": "<follow-up email subject>", "body": "<HTML email body>" },
+    "unresponsive": { "count": <number>, "subject": "<re-engagement email subject>", "body": "<HTML email body>" },
+    "failed":       { "count": <number>, "subject": "<bounce handling subject>",  "body": "<HTML email body>" }
+  }
+}
+Rules:
+- All email bodies must be valid HTML using only <p>, <strong>, <a>, <br> tags
+- Use {{FIRST_NAME}} and {{COMPANY}} tokens for personalisation where natural
+- The tone should be professional B2B
+- Do not include unsubscribe footers or legal text`;
+
 interface AiFollowUpPanelProps {
   selectedBatchIds: string[];
   idToken: string | null;
@@ -29,15 +45,15 @@ interface AiFollowUpPanelProps {
 export function AiFollowUpPanel({ selectedBatchIds, idToken, onClose }: AiFollowUpPanelProps) {
   const router = useRouter();
 
-  const [status,    setStatus]    = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
-  const [errorMsg,  setErrorMsg]  = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<PanelTab>('summary');
+  const [status,       setStatus]       = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
+  const [errorMsg,     setErrorMsg]     = useState<string | null>(null);
+  const [activeTab,    setActiveTab]    = useState<PanelTab>('summary');
+  const [promptOpen,   setPromptOpen]   = useState(false);
+  const [customPrompt, setCustomPrompt] = useState(DEFAULT_PROMPT);
 
-  // AI result (mutable so we can patch subject/body edits)
   const [result, setResult] = useState<AiAnalysisResult | null>(null);
   const [drafts, setDrafts] = useState<Record<SegmentKey, AiSegmentDraft> | null>(null);
 
-  // Recipients per segment (streamed as a trailer after the JSON)
   const recipientsRef = useRef<Record<SegmentKey, RecipientRow[]>>({
     engaged: [], unresponsive: [], failed: [],
   });
@@ -56,7 +72,10 @@ export function AiFollowUpPanel({ selectedBatchIds, idToken, onClose }: AiFollow
           'Content-Type':  'application/json',
           Authorization:   `Bearer ${idToken}`,
         },
-        body: JSON.stringify({ batchIds: selectedBatchIds }),
+        body: JSON.stringify({
+          batchIds:     selectedBatchIds,
+          customPrompt: customPrompt !== DEFAULT_PROMPT ? customPrompt : undefined,
+        }),
       });
 
       if (!res.ok) {
@@ -64,7 +83,6 @@ export function AiFollowUpPanel({ selectedBatchIds, idToken, onClose }: AiFollow
         throw new Error(message);
       }
 
-      // Read the full streamed text
       const reader  = res.body!.getReader();
       const decoder = new TextDecoder();
       let   raw     = '';
@@ -74,7 +92,6 @@ export function AiFollowUpPanel({ selectedBatchIds, idToken, onClose }: AiFollow
         raw += decoder.decode(value, { stream: true });
       }
 
-      // Split AI JSON from recipients trailer
       const SEPARATOR = '\n\n__RECIPIENTS__\n';
       const sepIdx    = raw.indexOf(SEPARATOR);
       const jsonPart  = sepIdx >= 0 ? raw.slice(0, sepIdx) : raw;
@@ -94,7 +111,7 @@ export function AiFollowUpPanel({ selectedBatchIds, idToken, onClose }: AiFollow
       setErrorMsg(err instanceof Error ? err.message : 'Analysis failed. Please try again.');
       setStatus('error');
     }
-  }, [idToken, selectedBatchIds]);
+  }, [idToken, selectedBatchIds, customPrompt]);
 
   const patchDraft = (seg: SegmentKey, field: 'subject' | 'body', value: string) => {
     setDrafts((prev) => prev ? { ...prev, [seg]: { ...prev[seg], [field]: value } } : prev);
@@ -143,26 +160,66 @@ export function AiFollowUpPanel({ selectedBatchIds, idToken, onClose }: AiFollow
 
           {/* Idle */}
           {status === 'idle' && (
-            <div className="flex flex-col items-center justify-center gap-5 h-full px-8 text-center">
-              <div className="w-14 h-14 rounded-full bg-brand-50 flex items-center justify-center">
-                <SparklesIcon className="w-7 h-7 text-brand-500" />
+            <div className="flex flex-col gap-5 px-6 py-6">
+              {/* Icon + description */}
+              <div className="flex flex-col items-center text-center gap-3">
+                <div className="w-14 h-14 rounded-full bg-brand-50 flex items-center justify-center">
+                  <SparklesIcon className="w-7 h-7 text-brand-500" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">Analyse your campaign</p>
+                  <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                    SAP AI Core will summarise performance, segment your recipients, and draft
+                    personalised follow-up emails for each group.
+                  </p>
+                </div>
+                {selectedBatchIds.length === 0 && (
+                  <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    Select at least one campaign to analyse.
+                  </p>
+                )}
               </div>
-              <div>
-                <p className="text-sm font-semibold text-gray-900">Analyse your campaign</p>
-                <p className="text-xs text-gray-500 mt-1 leading-relaxed">
-                  SAP AI Core will summarise performance, segment your recipients, and draft
-                  personalised follow-up emails for each group.
-                </p>
+
+              {/* Collapsible prompt editor */}
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <button
+                  onClick={() => setPromptOpen((o) => !o)}
+                  className="w-full flex items-center justify-between px-4 py-2.5 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+                >
+                  <span className="text-xs font-medium text-gray-600">Customize AI instructions</span>
+                  <ChevronDownIcon
+                    className={`w-3.5 h-3.5 text-gray-400 transition-transform ${promptOpen ? 'rotate-180' : ''}`}
+                  />
+                </button>
+                {promptOpen && (
+                  <div className="p-3 flex flex-col gap-2 border-t border-gray-200">
+                    <textarea
+                      value={customPrompt}
+                      onChange={(e) => setCustomPrompt(e.target.value)}
+                      rows={12}
+                      className="w-full px-3 py-2 rounded-md border border-gray-300 bg-white text-xs text-gray-800 font-mono
+                                 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors resize-y"
+                    />
+                    <div className="flex items-center justify-between">
+                      <p className="text-[10px] text-gray-400">
+                        Changes apply to the next analysis run only.
+                      </p>
+                      <button
+                        onClick={() => setCustomPrompt(DEFAULT_PROMPT)}
+                        className="text-[10px] text-brand-600 hover:underline"
+                      >
+                        Reset to default
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
-              {selectedBatchIds.length === 0 && (
-                <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                  Select at least one campaign to analyse.
-                </p>
-              )}
+
+              {/* Analyse button */}
               <button
                 onClick={runAnalysis}
                 disabled={selectedBatchIds.length === 0}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-brand-600 hover:bg-brand-500
+                className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-brand-600 hover:bg-brand-500
                            text-white text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed
                            transition-colors shadow-sm"
               >
@@ -226,14 +283,11 @@ export function AiFollowUpPanel({ selectedBatchIds, idToken, onClose }: AiFollow
               {/* Tab content */}
               <div className="flex-1 overflow-y-auto p-5">
 
-                {/* Summary tab */}
                 {activeTab === 'summary' && (
                   <div className="flex flex-col gap-4">
                     <div className="prose prose-sm max-w-none text-gray-700 text-sm leading-relaxed whitespace-pre-line">
                       {result.summary}
                     </div>
-
-                    {/* Segment count pills */}
                     <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
                       {(Object.keys(SEGMENT_LABELS) as SegmentKey[]).map((seg) => (
                         <button
@@ -252,7 +306,6 @@ export function AiFollowUpPanel({ selectedBatchIds, idToken, onClose }: AiFollow
                   </div>
                 )}
 
-                {/* Segment tabs */}
                 {(activeTab === 'engaged' || activeTab === 'unresponsive' || activeTab === 'failed') && (
                   <SegmentEditor
                     segKey={activeTab}
@@ -271,7 +324,7 @@ export function AiFollowUpPanel({ selectedBatchIds, idToken, onClose }: AiFollow
         {status === 'done' && (
           <div className="px-5 py-3 border-t border-gray-200 flex-shrink-0">
             <button
-              onClick={runAnalysis}
+              onClick={() => setStatus('idle')}
               className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-gray-300
                          bg-white text-xs text-gray-600 font-medium hover:bg-gray-50 transition-colors"
             >
@@ -299,7 +352,6 @@ function SegmentEditor({ segKey, draft, recipientCount, onChange, onLaunch }: Se
   const cfg = SEGMENT_LABELS[segKey];
   return (
     <div className="flex flex-col gap-4">
-      {/* Recipient count */}
       <div className="flex items-center gap-2">
         <UsersIcon className="w-3.5 h-3.5 text-gray-400" />
         <span className="text-xs text-gray-500">
@@ -307,7 +359,6 @@ function SegmentEditor({ segKey, draft, recipientCount, onChange, onLaunch }: Se
         </span>
       </div>
 
-      {/* Subject */}
       <div className="flex flex-col gap-1.5">
         <label className="text-xs font-semibold text-gray-600">Subject line</label>
         <input
@@ -319,7 +370,6 @@ function SegmentEditor({ segKey, draft, recipientCount, onChange, onLaunch }: Se
         />
       </div>
 
-      {/* Body */}
       <div className="flex flex-col gap-1.5">
         <label className="text-xs font-semibold text-gray-600">Email body (HTML)</label>
         <textarea
@@ -334,7 +384,6 @@ function SegmentEditor({ segKey, draft, recipientCount, onChange, onLaunch }: Se
         </p>
       </div>
 
-      {/* Launch */}
       <button
         onClick={onLaunch}
         disabled={recipientCount === 0}

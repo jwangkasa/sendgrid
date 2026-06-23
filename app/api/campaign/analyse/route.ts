@@ -5,8 +5,24 @@ import { query } from '@/lib/db';
 import type { RecipientLog, RecipientRow } from '@/lib/types';
 
 interface AnalyseRequestBody {
-  batchIds: string[];
+  batchIds:     string[];
+  customPrompt?: string;
 }
+
+const DEFAULT_SYSTEM_PROMPT = `You are a B2B email marketing analyst. Analyse the campaign data provided and respond with ONLY a valid JSON object — no markdown, no explanation, no code fences. Use exactly this structure:
+{
+  "summary": "<2 paragraphs of plain-English campaign performance narrative>",
+  "segments": {
+    "engaged":      { "count": <number>, "subject": "<follow-up email subject>", "body": "<HTML email body>" },
+    "unresponsive": { "count": <number>, "subject": "<re-engagement email subject>", "body": "<HTML email body>" },
+    "failed":       { "count": <number>, "subject": "<bounce handling subject>",  "body": "<HTML email body>" }
+  }
+}
+Rules:
+- All email bodies must be valid HTML using only <p>, <strong>, <a>, <br> tags
+- Use {{FIRST_NAME}} and {{COMPANY}} tokens for personalisation where natural
+- The tone should be professional B2B
+- Do not include unsubscribe footers or legal text`;
 
 // ── SAP AI Core credentials ───────────────────────────────────────────────────
 
@@ -76,7 +92,7 @@ export async function POST(req: NextRequest): Promise<NextResponse | Response> {
     return NextResponse.json({ message: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const { batchIds } = body;
+  const { batchIds, customPrompt } = body;
   if (!Array.isArray(batchIds) || batchIds.length === 0) {
     return NextResponse.json({ message: 'batchIds must be a non-empty array' }, { status: 400 });
   }
@@ -153,20 +169,9 @@ export async function POST(req: NextRequest): Promise<NextResponse | Response> {
   };
 
   // ── 7. Fetch OAuth2 token + call SAP AI Core directly ────────────────────────
-  const systemPrompt = `You are a B2B email marketing analyst. Analyse the campaign data provided and respond with ONLY a valid JSON object — no markdown, no explanation, no code fences. Use exactly this structure:
-{
-  "summary": "<2 paragraphs of plain-English campaign performance narrative>",
-  "segments": {
-    "engaged":      { "count": <number>, "subject": "<follow-up email subject>", "body": "<HTML email body>" },
-    "unresponsive": { "count": <number>, "subject": "<re-engagement email subject>", "body": "<HTML email body>" },
-    "failed":       { "count": <number>, "subject": "<bounce handling subject>",  "body": "<HTML email body>" }
-  }
-}
-Rules:
-- All email bodies must be valid HTML using only <p>, <strong>, <a>, <br> tags
-- Use {{FIRST_NAME}} and {{COMPANY}} tokens for personalisation where natural
-- The tone should be professional B2B
-- Do not include unsubscribe footers or legal text`;
+  const systemPrompt = (typeof customPrompt === 'string' && customPrompt.trim())
+    ? customPrompt.trim()
+    : DEFAULT_SYSTEM_PROMPT;
 
   const userMessage = `Campaign: ${campaignNames}
 Total recipients: ${total}
