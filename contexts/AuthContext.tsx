@@ -10,8 +10,7 @@ import {
 } from 'react';
 import {
   GoogleAuthProvider,
-  signInWithRedirect,
-  getRedirectResult,
+  signInWithPopup,
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
   onAuthStateChanged,
@@ -37,11 +36,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [idToken, setIdToken]     = useState<string | null>(null);
   const [loading, setLoading]     = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
-
-  useEffect(() => {
-    // Handle redirect result after Google sign-in
-    getRedirectResult(firebaseAuth).catch(() => {});
-  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(firebaseAuth, async (firebaseUser) => {
@@ -99,9 +93,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signInWithGoogle = useCallback(async () => {
+    setAuthError(null);
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
-    await signInWithRedirect(firebaseAuth, provider);
+    try {
+      await signInWithPopup(firebaseAuth, provider);
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code;
+      if (code !== 'auth/popup-closed-by-user' && code !== 'auth/cancelled-popup-request') {
+        setAuthError('Google sign-in failed. Please try again.');
+      }
+    }
   }, []);
 
   const signOut = useCallback(async () => {

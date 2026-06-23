@@ -4,10 +4,12 @@ import { useEffect, useState, useRef, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import useSWR from 'swr';
+import { utils as xlsxUtils, writeFile as xlsxWriteFile } from 'xlsx';
 import { useMetricsPolling } from './components/useMetricsPolling';
 import { KPICards } from './components/KPICards';
 import { RecipientTable } from './components/RecipientTable';
 import type { BatchSummary } from '@/app/api/campaign/batches/route';
+import type { RecipientLog } from '@/lib/types';
 import {
   PlusIcon,
   RefreshCwIcon,
@@ -16,6 +18,7 @@ import {
   AlertCircleIcon,
   ChevronDownIcon,
   XIcon,
+  DownloadIcon,
 } from 'lucide-react';
 import { Logo } from '@/app/components/Logo';
 
@@ -252,6 +255,36 @@ function DashboardContent() {
   const selectAll  = useCallback(() => setSelectedIds(new Set(batches.map((b) => b.batchId))), [batches]);
   const clearAll   = useCallback(() => setSelectedIds(new Set()), []);
 
+  const exportToExcel = useCallback(() => {
+    if (!data?.rows.length) return;
+    const exportRows = data.rows.map((r: RecipientLog) => ({
+      'First Name':     r.FIRST_NAME    ?? '',
+      'Last Name':      r.LAST_NAME     ?? '',
+      'Email':          r.EMAIL_ADDRESS,
+      'Company':        r.COMPANY       ?? '',
+      'Category':       r.CATEGORY      ?? '',
+      'Phone':          r.PHONE_NUMBER  ?? '',
+      'Comments':       r.COMMENTS      ?? '',
+      'Campaign':       r.CAMPAIGN_NAME ?? '',
+      'Status':         r.DELIVERY_STATUS,
+      'Opens':          r.OPEN_COUNT,
+      'Clicks':         r.CLICK_COUNT,
+      'Failure Reason': r.FAILURE_REASON ?? '',
+      'Updated At':     r.UPDATED_AT,
+    }));
+    const ws = xlsxUtils.json_to_sheet(exportRows);
+    const wb = xlsxUtils.book_new();
+    xlsxUtils.book_append_sheet(wb, ws, 'Recipients');
+    const selectedNames = batches
+      .filter((b) => selectedIds.has(b.batchId))
+      .map((b) => b.campaignName)
+      .join('_')
+      .replace(/[^a-zA-Z0-9_-]/g, '_')
+      .slice(0, 60);
+    const fileName = `recipients_${selectedNames || 'export'}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    xlsxWriteFile(wb, fileName);
+  }, [data, batches, selectedIds]);
+
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -449,7 +482,20 @@ function DashboardContent() {
             <div className="flex flex-col gap-3">
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-semibold text-gray-900">Recipient Details</h2>
-                {data && <span className="text-xs text-gray-400">{data.rows.length.toLocaleString()} rows</span>}
+                <div className="flex items-center gap-3">
+                  {data && <span className="text-xs text-gray-400">{data.rows.length.toLocaleString()} rows</span>}
+                  {data?.rows.length ? (
+                    <button
+                      onClick={exportToExcel}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-300
+                                 bg-white text-xs text-gray-700 font-medium hover:bg-gray-50
+                                 transition-colors shadow-sm"
+                    >
+                      <DownloadIcon className="w-3.5 h-3.5" />
+                      Export Excel
+                    </button>
+                  ) : null}
+                </div>
               </div>
               {isLoading && !data ? <SkeletonTable /> : data ? <RecipientTable rows={data.rows} /> : null}
             </div>
