@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { AzureOpenAiChatClient } from '@sap-ai-sdk/foundation-models';
 import { requireAuth, AuthError } from '@/lib/auth-middleware';
 import { assertSameOrigin } from '@/lib/cors';
 import { query } from '@/lib/db';
@@ -9,31 +8,51 @@ interface AnalyseRequestBody {
   batchIds: string[];
 }
 
-function getAiCoreDestination() {
-  const url             = process.env.AICORE_BASE_URL;
-  const tokenServiceUrl = process.env.AICORE_AUTH_URL;
-  const clientId        = process.env.AICORE_CLIENT_ID;
-  const clientSecret    = process.env.AICORE_CLIENT_SECRET;
+// ── SAP AI Core credentials ───────────────────────────────────────────────────
 
-  if (!url || !tokenServiceUrl || !clientId || !clientSecret) {
-    const missing = ['AICORE_BASE_URL','AICORE_AUTH_URL','AICORE_CLIENT_ID','AICORE_CLIENT_SECRET']
-      .filter(k => !process.env[k]);
-    throw new Error(`Missing SAP AI Core credentials: ${missing.join(', ')}`);
+function getCredentials() {
+  const baseUrl       = process.env.AICORE_BASE_URL;
+  const authUrl       = process.env.AICORE_AUTH_URL;
+  const clientId      = process.env.AICORE_CLIENT_ID;
+  const clientSecret  = process.env.AICORE_CLIENT_SECRET;
+  const deploymentId  = process.env.AICORE_DEPLOYMENT_ID;
+  const resourceGroup = process.env.AICORE_RESOURCE_GROUP ?? 'default';
+
+  const missing = ['AICORE_BASE_URL','AICORE_AUTH_URL','AICORE_CLIENT_ID','AICORE_CLIENT_SECRET','AICORE_DEPLOYMENT_ID']
+    .filter(k => !process.env[k]);
+  if (missing.length > 0) {
+    throw new Error(`Missing SAP AI Core env vars: ${missing.join(', ')}`);
   }
 
-  // Log credential shape (never log actual values) to help diagnose truncation issues
-  console.log('[analyse] AI Core credentials check — clientId length:', clientId.length,
-    '| clientSecret length:', clientSecret.length,
-    '| url:', url);
-
-  return {
-    url,
-    authentication: 'OAuth2ClientCredentials' as const,
-    tokenServiceUrl,
-    clientId,
-    clientSecret,
-  };
+  return { baseUrl: baseUrl!, authUrl: authUrl!, clientId: clientId!, clientSecret: clientSecret!, deploymentId: deploymentId!, resourceGroup };
 }
+
+// ── Fetch OAuth2 bearer token via client_credentials grant ───────────────────
+
+async function fetchBearerToken(authUrl: string, clientId: string, clientSecret: string): Promise<string> {
+  const body = new URLSearchParams({ grant_type: 'client_credentials' });
+
+  const res = await fetch(authUrl, {
+    method:  'POST',
+    headers: {
+      'Content-Type':  'application/x-www-form-urlencoded',
+      Authorization:   `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
+    },
+    body: body.toString(),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`AI Core OAuth2 token fetch failed (${res.status}): ${text.slice(0, 200)}`);
+  }
+
+  const json = await res.json() as { access_token?: string };
+  if (!json.access_token) throw new Error('AI Core OAuth2 response missing access_token');
+  return json.access_token;
+}
+
+// ── Route handler ─────────────────────────────────────────────────────────────
+
 export async function POST(req: NextRequest): Promise<NextResponse | Response> {
   // ── 1. CORS guard ────────────────────────────────────────────────────────────
   const corsBlock = assertSameOrigin(req);
@@ -104,9 +123,9 @@ export async function POST(req: NextRequest): Promise<NextResponse | Response> {
     }
   }
 
-  const total      = rows.length;
-  const openRate   = total > 0 ? ((engaged.length / total) * 100).toFixed(1) : '0';
-  const failRate   = total > 0 ? ((failed.length  / total) * 100).toFixed(1) : '0';
+  const total     = rows.length;
+  const openRate  = total > 0 ? ((engaged.length / total) * 100).toFixed(1) : '0';
+  const failRate  = total > 0 ? ((failed.length  / total) * 100).toFixed(1) : '0';
 
   const campaignNames = [...new Set(rows.map((r) => r.CAMPAIGN_NAME).filter(Boolean))].join(', ') || 'Unknown Campaign';
 
@@ -133,7 +152,7 @@ export async function POST(req: NextRequest): Promise<NextResponse | Response> {
     failed:       failed.map(toRecipientRow),
   };
 
-  // ── 7. Call SAP AI Core (streaming) ──────────────────────────────────────────
+  // ── 7. Fetch OAuth2 token + call SAP AI Core directly ────────────────────────
   const systemPrompt = `You are a B2B email marketing analyst. Analyse the campaign data provided and respond with ONLY a valid JSON object — no markdown, no explanation, no code fences. Use exactly this structure:
 {
   "summary": "<2 paragraphs of plain-English campaign performance narrative>",
@@ -161,69 +180,74 @@ Sample failed recipients: ${sample(failed) || 'none'}
 
 Generate the campaign summary and one follow-up email draft per segment. Set the "count" fields to exactly: engaged=${engaged.length}, unresponsive=${unresponsive.length}, failed=${failed.length}.`;
 
-  let aiStream: AsyncIterable<string>;
+  let creds: ReturnType<typeof getCredentials>;
   try {
-    const destination    = getAiCoreDestination();
-    const deploymentId   = process.env.AICORE_DEPLOYMENT_ID;
-    const resourceGroup  = process.env.AICORE_RESOURCE_GROUP ?? 'default';
+    creds = getCredentials();
+  } catch (err) {
+    return NextResponse.json({ message: (err as Error).message }, { status: 500 });
+  }
 
-    if (!deploymentId) {
-      return NextResponse.json({ message: 'AICORE_DEPLOYMENT_ID is not configured' }, { status: 500 });
-    }
+  let bearerToken: string;
+  try {
+    bearerToken = await fetchBearerToken(creds.authUrl, creds.clientId, creds.clientSecret);
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    console.error('[analyse] OAuth2 token error:', detail);
+    return NextResponse.json({ message: `AI Core auth failed: ${detail}` }, { status: 502 });
+  }
 
-    const client = new AzureOpenAiChatClient(
-      { deploymentId, resourceGroup },
-      destination,
-    );
-    const result = await client.stream({
-        messages: [
+  // Build the chat completions URL:
+  // baseUrl already contains /v2, SDK appends /inference/deployments/{id}/chat/completions
+  const chatUrl = `${creds.baseUrl.replace(/\/$/, '')}/inference/deployments/${creds.deploymentId}/chat/completions`;
+
+  let aiRes: globalThis.Response;
+  try {
+    aiRes = await fetch(chatUrl, {
+      method:  'POST',
+      headers: {
+        'Content-Type':      'application/json',
+        Authorization:       `Bearer ${bearerToken}`,
+        'ai-resource-group': creds.resourceGroup,
+      },
+      body: JSON.stringify({
+        messages:    [
           { role: 'system', content: systemPrompt },
           { role: 'user',   content: userMessage  },
         ],
         max_tokens:  2000,
         temperature: 0.4,
-      });
-    aiStream = result.stream.toContentStream();
+        stream:      false,
+      }),
+    });
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
-    // Log the full error including cause chain so Vercel logs show the real reason
-    const cause  = (err as { cause?: unknown })?.cause;
-    const causeDetail = cause instanceof Error ? cause.message : cause ? String(cause) : null;
-    console.error('[analyse] SAP AI Core error:', detail, causeDetail ? `| cause: ${causeDetail}` : '', err);
+    console.error('[analyse] AI Core fetch error:', detail);
+    return NextResponse.json({ message: `AI Core network error: ${detail}` }, { status: 502 });
+  }
+
+  if (!aiRes.ok) {
+    const text = await aiRes.text().catch(() => '');
+    console.error('[analyse] AI Core non-OK response:', aiRes.status, text.slice(0, 500));
     return NextResponse.json(
-      { message: `AI service error: ${detail}${causeDetail ? ` — ${causeDetail}` : ''}` },
+      { message: `AI Core returned ${aiRes.status}: ${text.slice(0, 200)}` },
       { status: 502 }
     );
   }
 
-  // ── 8. Stream response — JSON text + recipients appended as a trailer ─────────
-  // We stream the AI JSON text first, then append a sentinel + serialised
-  // recipient arrays so the client can build the "Launch" payload without a
-  // second round-trip.
-  const encoder = new TextEncoder();
+  interface ChatCompletion {
+    choices: { message: { content: string } }[];
+  }
+  const completion = await aiRes.json() as ChatCompletion;
+  const aiText = completion.choices?.[0]?.message?.content ?? '';
+
+  // ── 8. Return JSON text + recipients as a single response ─────────────────────
   const SEPARATOR = '\n\n__RECIPIENTS__\n';
+  const responseBody = aiText + SEPARATOR + JSON.stringify(segmentRecipients);
 
-  const readable = new ReadableStream({
-    async start(controller) {
-      try {
-        for await (const chunk of aiStream) {
-          controller.enqueue(encoder.encode(chunk));
-        }
-        // Append recipient data after the AI JSON
-        controller.enqueue(encoder.encode(SEPARATOR + JSON.stringify(segmentRecipients)));
-      } catch (err) {
-        console.error('[analyse] stream error:', err);
-      } finally {
-        controller.close();
-      }
-    },
-  });
-
-  return new Response(readable, {
+  return new Response(responseBody, {
     headers: {
       'Content-Type':  'text/plain; charset=utf-8',
       'Cache-Control': 'no-store',
-      'X-Accel-Buffering': 'no',
     },
   });
 }
