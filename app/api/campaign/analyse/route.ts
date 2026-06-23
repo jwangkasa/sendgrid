@@ -10,16 +10,21 @@ interface AnalyseRequestBody {
 }
 
 function getAiCoreDestination() {
-  const url           = process.env.AICORE_BASE_URL;
+  const url             = process.env.AICORE_BASE_URL;
   const tokenServiceUrl = process.env.AICORE_AUTH_URL;
-  const clientId      = process.env.AICORE_CLIENT_ID;
-  const clientSecret  = process.env.AICORE_CLIENT_SECRET;
+  const clientId        = process.env.AICORE_CLIENT_ID;
+  const clientSecret    = process.env.AICORE_CLIENT_SECRET;
 
   if (!url || !tokenServiceUrl || !clientId || !clientSecret) {
-    throw new Error(
-      'Missing SAP AI Core credentials. Set AICORE_BASE_URL, AICORE_AUTH_URL, AICORE_CLIENT_ID, AICORE_CLIENT_SECRET in your environment.'
-    );
+    const missing = ['AICORE_BASE_URL','AICORE_AUTH_URL','AICORE_CLIENT_ID','AICORE_CLIENT_SECRET']
+      .filter(k => !process.env[k]);
+    throw new Error(`Missing SAP AI Core credentials: ${missing.join(', ')}`);
   }
+
+  // Log credential shape (never log actual values) to help diagnose truncation issues
+  console.log('[analyse] AI Core credentials check — clientId length:', clientId.length,
+    '| clientSecret length:', clientSecret.length,
+    '| url:', url);
 
   return {
     url,
@@ -181,8 +186,14 @@ Generate the campaign summary and one follow-up email draft per segment. Set the
     aiStream = result.stream.toContentStream();
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
-    console.error('[analyse] SAP AI Core error:', err);
-    return NextResponse.json({ message: `AI service error: ${detail}` }, { status: 502 });
+    // Log the full error including cause chain so Vercel logs show the real reason
+    const cause  = (err as { cause?: unknown })?.cause;
+    const causeDetail = cause instanceof Error ? cause.message : cause ? String(cause) : null;
+    console.error('[analyse] SAP AI Core error:', detail, causeDetail ? `| cause: ${causeDetail}` : '', err);
+    return NextResponse.json(
+      { message: `AI service error: ${detail}${causeDetail ? ` — ${causeDetail}` : ''}` },
+      { status: 502 }
+    );
   }
 
   // ── 8. Stream response — JSON text + recipients appended as a trailer ─────────
