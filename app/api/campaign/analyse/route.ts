@@ -9,6 +9,26 @@ interface AnalyseRequestBody {
   batchIds: string[];
 }
 
+function getAiCoreDestination() {
+  const url           = process.env.AICORE_BASE_URL;
+  const tokenServiceUrl = process.env.AICORE_AUTH_URL;
+  const clientId      = process.env.AICORE_CLIENT_ID;
+  const clientSecret  = process.env.AICORE_CLIENT_SECRET;
+
+  if (!url || !tokenServiceUrl || !clientId || !clientSecret) {
+    throw new Error(
+      'Missing SAP AI Core credentials. Set AICORE_BASE_URL, AICORE_AUTH_URL, AICORE_CLIENT_ID, AICORE_CLIENT_SECRET in your environment.'
+    );
+  }
+
+  return {
+    url,
+    authentication: 'OAuth2ClientCredentials' as const,
+    tokenServiceUrl,
+    clientId,
+    clientSecret,
+  };
+}
 export async function POST(req: NextRequest): Promise<NextResponse | Response> {
   // ── 1. CORS guard ────────────────────────────────────────────────────────────
   const corsBlock = assertSameOrigin(req);
@@ -138,15 +158,26 @@ Generate the campaign summary and one follow-up email draft per segment. Set the
 
   let aiStream: AsyncIterable<string>;
   try {
-    const client  = new AzureOpenAiChatClient('gpt-4o');
-    const result  = await client.stream({
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user',   content: userMessage  },
-      ],
-      max_tokens:  2000,
-      temperature: 0.4,
-    });
+    const destination    = getAiCoreDestination();
+    const deploymentId   = process.env.AICORE_DEPLOYMENT_ID;
+    const resourceGroup  = process.env.AICORE_RESOURCE_GROUP ?? 'default';
+
+    if (!deploymentId) {
+      return NextResponse.json({ message: 'AICORE_DEPLOYMENT_ID is not configured' }, { status: 500 });
+    }
+
+    const client = new AzureOpenAiChatClient(
+      { deploymentId, resourceGroup },
+      destination,
+    );
+    const result = await client.stream({
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user',   content: userMessage  },
+        ],
+        max_tokens:  2000,
+        temperature: 0.4,
+      });
     aiStream = result.stream.toContentStream();
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
