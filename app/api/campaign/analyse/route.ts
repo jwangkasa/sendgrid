@@ -196,8 +196,9 @@ Generate the campaign summary and one follow-up email draft per segment. Set the
     return NextResponse.json({ message: `AI Core auth failed: ${detail}` }, { status: 502 });
   }
 
-  // SAP AI Core inference URL: {baseUrl}/lm/deployments/{deploymentId}/chat/completions
-  const chatUrl = `${creds.baseUrl.replace(/\/$/, '')}/lm/deployments/${creds.deploymentId}/chat/completions`;
+  // SAP AI Core: strip any trailing /v2 or slash from base URL, then add the full versioned path
+  const apiBase = creds.baseUrl.replace(/\/v2\/?$/, '').replace(/\/$/, '');
+  const chatUrl = `${apiBase}/v2/inference/deployments/${creds.deploymentId}/chat/completions`;
 
   let aiRes: globalThis.Response;
   try {
