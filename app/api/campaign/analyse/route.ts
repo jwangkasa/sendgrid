@@ -196,12 +196,9 @@ Generate the campaign summary and one follow-up email draft per segment. Set the
     return NextResponse.json({ message: `AI Core auth failed: ${detail}` }, { status: 502 });
   }
 
-  // SAP AI Core: strip any trailing /v2 or slash from base URL, then add the full versioned path
+  // SAP AI Core orchestration endpoint
   const apiBase = creds.baseUrl.replace(/\/v2\/?$/, '').replace(/\/$/, '');
-  const chatUrl = `${apiBase}/v2/inference/deployments/${creds.deploymentId}/chat/completions`;
-  console.log('[analyse] chatUrl:', chatUrl);
-  console.log('[analyse] resourceGroup:', creds.resourceGroup);
-  console.log('[analyse] deploymentId:', creds.deploymentId);
+  const chatUrl = `${apiBase}/v2/inference/deployments/${creds.deploymentId}/completion`;
 
   let aiRes: globalThis.Response;
   try {
@@ -213,13 +210,21 @@ Generate the campaign summary and one follow-up email draft per segment. Set the
         'ai-resource-group': creds.resourceGroup,
       },
       body: JSON.stringify({
-        messages:    [
-          { role: 'system', content: systemPrompt },
-          { role: 'user',   content: userMessage  },
-        ],
-        max_tokens:  2000,
-        temperature: 0.4,
-        stream:      false,
+        orchestration_config: {
+          module_configurations: {
+            templating_module_config: {
+              template: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user',   content: userMessage  },
+              ],
+            },
+            llm_module_config: {
+              model_name:   'gpt-4o-mini',
+              model_params: { max_tokens: 2000, temperature: 0.4 },
+            },
+          },
+        },
+        input_params: {},
       }),
     });
   } catch (err) {
@@ -237,11 +242,11 @@ Generate the campaign summary and one follow-up email draft per segment. Set the
     );
   }
 
-  interface ChatCompletion {
-    choices: { message: { content: string } }[];
+  interface OrchestrationResult {
+    orchestration_result?: { choices?: { message: { content: string } }[] };
   }
-  const completion = await aiRes.json() as ChatCompletion;
-  const aiText = completion.choices?.[0]?.message?.content ?? '';
+  const completion = await aiRes.json() as OrchestrationResult;
+  const aiText = completion.orchestration_result?.choices?.[0]?.message?.content ?? '';
 
   // ── 8. Return JSON text + recipients as a single response ─────────────────────
   const SEPARATOR = '\n\n__RECIPIENTS__\n';
