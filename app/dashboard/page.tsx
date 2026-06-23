@@ -8,6 +8,7 @@ import { utils as xlsxUtils, writeFile as xlsxWriteFile } from 'xlsx';
 import { useMetricsPolling } from './components/useMetricsPolling';
 import { KPICards } from './components/KPICards';
 import { RecipientTable } from './components/RecipientTable';
+import { AiFollowUpPanel } from './components/AiFollowUpPanel';
 import type { BatchSummary } from '@/app/api/campaign/batches/route';
 import type { RecipientLog } from '@/lib/types';
 import {
@@ -19,6 +20,7 @@ import {
   ChevronDownIcon,
   XIcon,
   DownloadIcon,
+  SparklesIcon,
 } from 'lucide-react';
 import { Logo } from '@/app/components/Logo';
 
@@ -195,7 +197,8 @@ function DashboardContent() {
   const initialBatch = searchParams.get('batchId');
 
   const startTimeRef = useRef<Date | null>(null);
-  const [startTime, setStartTime] = useState<Date | null>(null);
+  const [startTime,    setStartTime]    = useState<Date | null>(null);
+  const [aiPanelOpen,  setAiPanelOpen]  = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
     initialBatch ? new Set([initialBatch]) : new Set()
   );
@@ -335,6 +338,15 @@ function DashboardContent() {
             )}
             <button onClick={() => mutate()} className="p-1.5 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors" title="Refresh">
               <RefreshCwIcon className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setAiPanelOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-brand-200 bg-brand-50
+                         text-brand-700 text-xs font-medium hover:bg-brand-100 transition-colors"
+              title="AI Follow-Up"
+            >
+              <SparklesIcon className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">AI Follow-Up</span>
             </button>
             <div className="w-px h-5 bg-gray-200" />
             <button onClick={() => router.push('/campaign')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-500 text-white text-xs font-medium transition-colors">
@@ -510,6 +522,14 @@ function DashboardContent() {
           </>
         )}
       </main>
+
+      {aiPanelOpen && (
+        <AiFollowUpPanel
+          selectedBatchIds={Array.from(selectedIds)}
+          idToken={idToken}
+          onClose={() => setAiPanelOpen(false)}
+        />
+      )}
     </div>
   );
 }

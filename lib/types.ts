@@ -106,6 +106,21 @@ export interface CampaignRecipientDoc {
   updatedAt:      string;   // ISO timestamp
 }
 
+export interface AiSegmentDraft {
+  count:   number;
+  subject: string;
+  body:    string;
+}
+
+export interface AiAnalysisResult {
+  summary:  string;
+  segments: {
+    engaged:      AiSegmentDraft;
+    unresponsive: AiSegmentDraft;
+    failed:       AiSegmentDraft;
+  };
+}
+
 export interface DispatchResponseBody {
   batchId: string;
   totalQueued: number;

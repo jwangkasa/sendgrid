@@ -264,3 +264,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     { status: 200 }
   );
 }
+
+// Reject browser preflight probes — this endpoint is server-to-server only
+export function OPTIONS() {
+  return new NextResponse(null, { status: 405 });
+}

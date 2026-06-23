@@ -105,6 +105,29 @@ export default function CampaignPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Pre-populate from AI Follow-Up panel via sessionStorage
+  useEffect(() => {
+    const raw = sessionStorage.getItem('ai_followup_prefill');
+    if (!raw) return;
+    sessionStorage.removeItem('ai_followup_prefill');
+    try {
+      const { recipients: rows, subject, htmlBody } = JSON.parse(raw) as {
+        recipients: RecipientRow[];
+        subject:   string;
+        htmlBody:  string;
+      };
+      if (Array.isArray(rows) && rows.length > 0) {
+        setRecipients(rows, 'AI Follow-Up');
+        setTemplate((prev) => ({ ...prev, subject: subject ?? prev.subject, htmlBody: htmlBody ?? prev.htmlBody }));
+        setCompletedSteps(new Set<WizardStep>(['ingestion']));
+        setCurrentStep('compose');
+      }
+    } catch {
+      // malformed sessionStorage value — ignore
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   if (loading || (!loading && !user)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">

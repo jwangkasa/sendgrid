@@ -25,6 +25,7 @@
   /* Custom animations */
   --animate-fade-in: fadeIn 0.2s ease-out;
   --animate-slide-up: slideUp 0.25s ease-out;
+  --animate-slide-in-right: slideInRight 0.25s ease-out;
 
   @keyframes fadeIn {
     from { opacity: 0; }
@@ -34,6 +35,11 @@
   @keyframes slideUp {
     from { opacity: 0; transform: translateY(8px); }
     to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes slideInRight {
+    from { opacity: 0; transform: translateX(32px); }
+    to   { opacity: 1; transform: translateX(0); }
   }
 }
 
