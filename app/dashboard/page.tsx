@@ -21,8 +21,11 @@ import {
   XIcon,
   DownloadIcon,
   SparklesIcon,
+  PaintbrushIcon,
+  CheckIcon,
 } from 'lucide-react';
 import { Logo } from '@/app/components/Logo';
+import { TemplateBuilder } from '@/app/campaign/components/TemplateBuilder';
 
 // ─── Elapsed time counter ─────────────────────────────────────────────────────
 
@@ -199,6 +202,8 @@ function DashboardContent() {
   const startTimeRef = useRef<Date | null>(null);
   const [startTime,    setStartTime]    = useState<Date | null>(null);
   const [aiPanelOpen,  setAiPanelOpen]  = useState(false);
+  const [builderOpen,  setBuilderOpen]  = useState(false);
+  const [builderCopied, setBuilderCopied] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
     initialBatch ? new Set([initialBatch]) : new Set()
   );
@@ -327,6 +332,13 @@ function DashboardContent() {
               <span className="px-3 py-1.5 rounded-lg bg-brand-50 border border-brand-200 text-brand-700 text-xs font-semibold">
                 Dashboard
               </span>
+              <button
+                onClick={() => setBuilderOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 text-xs font-medium transition-colors"
+              >
+                <PaintbrushIcon className="w-3 h-3" />
+                Template Builder
+              </button>
             </nav>
           </div>
 
@@ -529,6 +541,26 @@ function DashboardContent() {
           idToken={idToken}
           onClose={() => setAiPanelOpen(false)}
         />
+      )}
+
+      {builderOpen && (
+        <TemplateBuilder
+          onApply={async (html) => {
+            await navigator.clipboard.writeText(html);
+            setBuilderOpen(false);
+            setBuilderCopied(true);
+            setTimeout(() => setBuilderCopied(false), 3000);
+          }}
+          onClose={() => setBuilderOpen(false)}
+        />
+      )}
+
+      {builderCopied && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2
+                        px-4 py-2.5 rounded-xl bg-gray-900 text-white text-sm shadow-xl animate-slide-up">
+          <CheckIcon className="w-4 h-4 text-emerald-400" />
+          HTML copied to clipboard
+        </div>
       )}
     </div>
   );

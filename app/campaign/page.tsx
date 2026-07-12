@@ -9,7 +9,8 @@ import { StepIngestion } from './components/StepIngestion';
 import { StepTemplateComposer } from './components/StepTemplateComposer';
 import { StepPreview } from './components/StepPreview';
 import { useRecipients } from './hooks/useRecipients';
-import { LogOutIcon } from 'lucide-react';
+import { TemplateBuilder } from './components/TemplateBuilder';
+import { LogOutIcon, PaintbrushIcon, CheckIcon } from 'lucide-react';
 import { Logo } from '@/app/components/Logo';
 
 export default function CampaignPage() {
@@ -28,6 +29,8 @@ export default function CampaignPage() {
   });
   const [dispatching, setDispatching]       = useState(false);
   const [dispatchError, setDispatchError]   = useState<string | null>(null);
+  const [builderOpen, setBuilderOpen]       = useState(false);
+  const [builderCopied, setBuilderCopied]   = useState(false);
 
   const { recipients, fileName, setRecipients, count } = useRecipients();
 
@@ -163,6 +166,13 @@ export default function CampaignPage() {
             >
               Dashboard
             </button>
+            <button
+              onClick={() => setBuilderOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 text-xs font-medium transition-colors"
+            >
+              <PaintbrushIcon className="w-3 h-3" />
+              Template Builder
+            </button>
           </nav>
 
           <div className="flex items-center gap-4">
@@ -247,6 +257,28 @@ export default function CampaignPage() {
           )}
         </div>
       </main>
+
+      {/* Standalone Template Builder */}
+      {builderOpen && (
+        <TemplateBuilder
+          onApply={async (html) => {
+            await navigator.clipboard.writeText(html);
+            setBuilderOpen(false);
+            setBuilderCopied(true);
+            setTimeout(() => setBuilderCopied(false), 3000);
+          }}
+          onClose={() => setBuilderOpen(false)}
+        />
+      )}
+
+      {/* Copy confirmation toast */}
+      {builderCopied && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2
+                        px-4 py-2.5 rounded-xl bg-gray-900 text-white text-sm shadow-xl animate-slide-up">
+          <CheckIcon className="w-4 h-4 text-emerald-400" />
+          HTML copied to clipboard
+        </div>
+      )}
     </div>
   );
 }

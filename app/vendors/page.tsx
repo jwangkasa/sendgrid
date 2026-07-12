@@ -8,8 +8,9 @@ import type { RowSelectionState } from '@tanstack/react-table';
 import type { VendorRow } from '@/app/api/vendors/route';
 import type { RecipientRow } from '@/lib/types';
 import { VendorTable } from './components/VendorTable';
-import { LogOutIcon, SendIcon, BuildingIcon } from 'lucide-react';
+import { LogOutIcon, SendIcon, BuildingIcon, PaintbrushIcon, CheckIcon } from 'lucide-react';
 import { Logo } from '@/app/components/Logo';
+import { TemplateBuilder } from '@/app/campaign/components/TemplateBuilder';
 
 const PAGE_SIZE = 10;
 
@@ -71,6 +72,8 @@ export default function VendorsPage() {
 
   const [page,         setPage]         = useState(1);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const [builderOpen,  setBuilderOpen]  = useState(false);
+  const [builderCopied, setBuilderCopied] = useState(false);
   const [filters,      setFilters]      = useState<VendorFilters>({
     category:         '',
     industry:         '',
@@ -169,6 +172,13 @@ export default function VendorsPage() {
             <button onClick={() => router.push('/dashboard')} className="px-3 py-1.5 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 text-xs font-medium transition-colors">
               Dashboard
             </button>
+            <button
+              onClick={() => setBuilderOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 text-xs font-medium transition-colors"
+            >
+              <PaintbrushIcon className="w-3 h-3" />
+              Template Builder
+            </button>
           </nav>
           <div className="flex items-center gap-4">
             {user && <span className="text-xs text-gray-500 hidden sm:block">{user.email}</span>}
@@ -240,6 +250,26 @@ export default function VendorsPage() {
           ) : null}
         </div>
       </main>
+
+      {builderOpen && (
+        <TemplateBuilder
+          onApply={async (html) => {
+            await navigator.clipboard.writeText(html);
+            setBuilderOpen(false);
+            setBuilderCopied(true);
+            setTimeout(() => setBuilderCopied(false), 3000);
+          }}
+          onClose={() => setBuilderOpen(false)}
+        />
+      )}
+
+      {builderCopied && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2
+                        px-4 py-2.5 rounded-xl bg-gray-900 text-white text-sm shadow-xl animate-slide-up">
+          <CheckIcon className="w-4 h-4 text-emerald-400" />
+          HTML copied to clipboard
+        </div>
+      )}
     </div>
   );
 }
