@@ -138,6 +138,35 @@ export function Toolbar({
     setTimeout(() => setCopyDone(false), 2000);
   }
 
+  function handlePreviewInBrowser() {
+    const w = state.canvasWidth ?? 600;
+    const body = exportBodyHtml(state);
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Email Preview</title>
+  <style>body{margin:0;padding:0;background:#e5e7eb;font-family:Arial,Helvetica,sans-serif;}
+  .preview-bar{background:#1e1b4b;color:#c7d2fe;font-size:12px;padding:10px 20px;display:flex;align-items:center;gap:16px;}
+  .preview-bar strong{color:#fff;}
+  </style>
+</head>
+<body>
+  <div class="preview-bar">
+    <strong>Email Preview</strong>
+    <span>Canvas width: ${w}px</span>
+    <span style="margin-left:auto;opacity:0.7;">Close this tab when done</span>
+  </div>
+  ${body}
+</body>
+</html>`;
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }
+
   function handleLoadJson(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (!f) return;
@@ -259,6 +288,20 @@ export function Toolbar({
           }}>
             {copyDone ? <CheckIcon style={{ width: 13, height: 13 }} /> : <CopyIcon style={{ width: 13, height: 13 }} />}
             {copyDone ? 'Copied!' : 'HTML'}
+          </button>
+        </Tip>
+
+        <Tip tip="Open rendered email preview in a new browser tab">
+          <button onClick={handlePreviewInBrowser} style={{
+            display: 'flex', alignItems: 'center', gap: 5,
+            padding: '4px 8px', borderRadius: 5,
+            border: '1px solid #818cf8',
+            background: 'linear-gradient(135deg,#eef2ff,#e0e7ff)',
+            cursor: 'pointer', fontSize: 11,
+            color: '#4338ca', whiteSpace: 'nowrap',
+          }}>
+            <EyeIcon style={{ width: 13, height: 13 }} />
+            Preview in browser
           </button>
         </Tip>
 
