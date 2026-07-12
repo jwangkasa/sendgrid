@@ -309,7 +309,7 @@ export function Toolbar({
           </button>
         </Tip>
 
-        <Tip tip={copyDone ? 'Copied!' : 'Copy email HTML to clipboard'}>
+        <Tip tip={copyDone ? 'Copied!' : 'Copy HTML source — paste into marketing platform editors (Mailchimp, HubSpot, SendGrid), not into email clients'}>
           <button onClick={handleCopyHtml} style={{
             display: 'flex', alignItems: 'center', gap: 5,
             padding: '4px 8px', borderRadius: 5,
@@ -319,7 +319,7 @@ export function Toolbar({
             color: copyDone ? '#059669' : '#374151', whiteSpace: 'nowrap',
           }}>
             {copyDone ? <CheckIcon style={{ width: 13, height: 13 }} /> : <CopyIcon style={{ width: 13, height: 13 }} />}
-            {copyDone ? 'Copied!' : 'HTML'}
+            {copyDone ? 'Copied!' : 'Copy HTML source'}
           </button>
         </Tip>
 
