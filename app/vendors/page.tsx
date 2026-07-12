@@ -260,6 +260,7 @@ export default function VendorsPage() {
             setTimeout(() => setBuilderCopied(false), 3000);
           }}
           onClose={() => setBuilderOpen(false)}
+          idToken={idToken}
         />
       )}
 

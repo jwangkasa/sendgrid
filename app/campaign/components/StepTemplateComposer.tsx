@@ -419,6 +419,7 @@ export function StepTemplateComposer({
             setBuilderOpen(false);
           }}
           onClose={() => setBuilderOpen(false)}
+          idToken={idToken}
         />
       )}
     </div>

@@ -5,7 +5,7 @@ import { Canvas } from './Canvas';
 import { Toolbar } from './Toolbar';
 import { ElementsPanel } from './ElementsPanel';
 import { exportHtml } from './htmlExporter';
-import type { CanvasElement, TemplateState, TextElement, TrackingScript } from './types';
+import type { CanvasElement, TemplateState, TextElement, ButtonElement, TrackingScript } from './types';
 
 const INITIAL_STATE: TemplateState = {
   elements: [],
@@ -20,6 +20,7 @@ const INITIAL_STATE: TemplateState = {
 interface TemplateBuilderProps {
   onApply: (html: string) => void;
   onClose: () => void;
+  idToken?: string | null;
 }
 
 function nextY(elements: CanvasElement[]): number {
@@ -27,7 +28,9 @@ function nextY(elements: CanvasElement[]): number {
   return Math.max(...elements.map((e) => e.y + e.height)) + 10;
 }
 
-export function TemplateBuilder({ onApply, onClose }: TemplateBuilderProps) {
+interface GenerateResponse { sections: { type: string; content: string; href?: string }[] }
+
+export function TemplateBuilder({ onApply, onClose, idToken }: TemplateBuilderProps) {
   const historyRef = useRef<TemplateState[]>([INITIAL_STATE]);
   const indexRef = useRef(0);
   const [tick, setTick] = useState(0);
@@ -37,6 +40,9 @@ export function TemplateBuilder({ onApply, onClose }: TemplateBuilderProps) {
   const [showEmoji, setShowEmoji] = useState(false);
   const [showSymbol, setShowSymbol] = useState(false);
   const [isPreview, setIsPreview] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
 
   const state = historyRef.current[indexRef.current] ?? INITIAL_STATE;
 
@@ -47,7 +53,11 @@ export function TemplateBuilder({ onApply, onClose }: TemplateBuilderProps) {
     rerender();
   }, [rerender]);
 
-  const cur = useCallback(() => historyRef.current[indexRef.current] ?? INITIAL_STATE, []);
+  const cur = useCallback((): TemplateState => {
+    const s = historyRef.current[indexRef.current] ?? INITIAL_STATE;
+    if (!Array.isArray(s.elements)) return { ...s, elements: [] };
+    return s;
+  }, []);
 
   const handleUpdate = useCallback((updated: CanvasElement) => {
     const c = cur();
@@ -74,7 +84,7 @@ export function TemplateBuilder({ onApply, onClose }: TemplateBuilderProps) {
     });
   }, [push, cur]);
 
-  const selectedElement = state.elements.find((el) => el.id === selectedId) ?? null;
+  const selectedElement = (state.elements ?? []).find((el) => el.id === selectedId) ?? null;
 
   // Canvas settings
   const handleSetCanvasWidth = useCallback((w: number) => push({ ...cur(), canvasWidth: w }), [push, cur]);
@@ -158,6 +168,77 @@ export function TemplateBuilder({ onApply, onClose }: TemplateBuilderProps) {
     push({ ...c, elements: c.elements.map((el) => el.id === selectedId ? { ...el, locked: !el.locked } : el) });
   }, [selectedId, push, cur]);
 
+  // AI content generation
+  const handleAiGenerate = useCallback(async () => {
+    const prompt = aiPrompt.trim();
+    if (!prompt || aiLoading) return;
+    setAiLoading(true);
+    setAiError(null);
+    try {
+      const res = await fetch('/api/campaign/generate-template', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+        },
+        body: JSON.stringify({ description: prompt }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ message: res.statusText }));
+        throw new Error((body as { message?: string }).message ?? `HTTP ${res.status}`);
+      }
+      const data = await res.json() as GenerateResponse;
+      const sections = data.sections ?? [];
+
+      const c = cur();
+      let yOffset = c.elements.length > 0 ? Math.max(...c.elements.map((e) => e.y + e.height)) + 20 : 20;
+      const newElements: CanvasElement[] = [];
+
+      for (const sec of sections) {
+        if (sec.type === 'heading') {
+          newElements.push({
+            id: `el-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            type: 'text',
+            x: 20, y: yOffset, width: c.canvasWidth - 40, height: 50,
+            content: sec.content,
+            fontSize: 24, fontColor: '#111827', fontWeight: 'bold',
+            fontStyle: 'normal', align: 'center', padding: 8,
+          } satisfies TextElement);
+          yOffset += 60;
+        } else if (sec.type === 'body') {
+          newElements.push({
+            id: `el-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            type: 'text',
+            x: 20, y: yOffset, width: c.canvasWidth - 40, height: 70,
+            content: sec.content,
+            fontSize: 14, fontColor: '#374151', fontWeight: 'normal',
+            fontStyle: 'normal', align: 'left', padding: 8,
+          } satisfies TextElement);
+          yOffset += 80;
+        } else if (sec.type === 'cta') {
+          newElements.push({
+            id: `el-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            type: 'button',
+            x: c.canvasWidth / 2 - 80, y: yOffset, width: 160, height: 44,
+            label: sec.content, href: sec.href ?? '#',
+            bgColor: '#4f46e5', textColor: '#ffffff',
+            borderRadius: 6, fontSize: 14,
+          } satisfies ButtonElement);
+          yOffset += 60;
+        }
+      }
+
+      if (newElements.length > 0) {
+        push({ ...c, elements: [...c.elements, ...newElements] });
+        setAiPrompt('');
+      }
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : 'Generation failed. Please try again.');
+    } finally {
+      setAiLoading(false);
+    }
+  }, [aiPrompt, aiLoading, cur, push, idToken]);
+
   // Save/load/apply
   const handleSaveJson = useCallback(() => {
     const c = cur();
@@ -169,7 +250,18 @@ export function TemplateBuilder({ onApply, onClose }: TemplateBuilderProps) {
   }, [cur]);
 
   const handleLoadJson = useCallback((loaded: TemplateState) => {
-    historyRef.current = [loaded];
+    const safe: TemplateState = {
+      ...INITIAL_STATE,
+      ...loaded,
+      elements:        Array.isArray(loaded?.elements)        ? loaded.elements        : [],
+      trackingScripts: Array.isArray(loaded?.trackingScripts) ? loaded.trackingScripts : [],
+      canvasWidth:     typeof loaded?.canvasWidth === 'number' && loaded.canvasWidth > 0 ? loaded.canvasWidth : 600,
+      canvasBackground: loaded?.canvasBackground ?? '#ffffff',
+      showGrid:        loaded?.showGrid        ?? false,
+      gridSize:        loaded?.gridSize        ?? 20,
+      backgroundImage: loaded?.backgroundImage ?? '',
+    };
+    historyRef.current = [safe];
     indexRef.current = 0;
     setSelectedId(null);
     rerender();
@@ -207,6 +299,56 @@ export function TemplateBuilder({ onApply, onClose }: TemplateBuilderProps) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', flexDirection: 'column', background: '#f1f5f9', fontFamily: 'Inter, Arial, sans-serif' }}>
+      {/* AI Content Generation Bar */}
+      <div style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e3a5f 100%)', padding: '10px 16px', borderBottom: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, maxWidth: 900, margin: '0 auto' }}>
+          <div style={{ flex: 1, position: 'relative' }}>
+            <input
+              type="text"
+              value={aiPrompt}
+              onChange={(e) => { setAiPrompt(e.currentTarget.value); setAiError(null); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') { void handleAiGenerate(); } }}
+              placeholder="Describe content to generate (e.g. SAP TechEd event invitation, Q3 product update)"
+              style={{
+                width: '100%', boxSizing: 'border-box',
+                padding: '8px 14px', borderRadius: 8,
+                border: '1px solid rgba(255,255,255,0.2)',
+                background: 'rgba(255,255,255,0.1)',
+                color: '#ffffff', fontSize: 13,
+                outline: 'none', backdropFilter: 'blur(4px)',
+              }}
+            />
+          </div>
+          <button
+            onClick={() => { void handleAiGenerate(); }}
+            disabled={aiLoading || !aiPrompt.trim()}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '8px 16px', borderRadius: 8, border: 'none', cursor: aiLoading || !aiPrompt.trim() ? 'not-allowed' : 'pointer',
+              background: aiLoading || !aiPrompt.trim() ? 'rgba(255,255,255,0.15)' : 'linear-gradient(135deg, #818cf8, #6366f1)',
+              color: '#ffffff', fontSize: 13, fontWeight: 600, flexShrink: 0,
+              opacity: aiLoading || !aiPrompt.trim() ? 0.6 : 1,
+              transition: 'opacity 0.15s, background 0.15s',
+            }}
+          >
+            {aiLoading ? (
+              <span style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', display: 'inline-block', animation: 'spin 0.7s linear infinite' }} />
+            ) : (
+              <span style={{ fontSize: 15 }}>✦</span>
+            )}
+            {aiLoading ? 'Generating…' : 'Write with AI'}
+          </button>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', maxWidth: 900, margin: '4px auto 0', paddingLeft: 2 }}>
+          <span style={{ fontSize: 11, color: 'rgba(199,210,254,0.7)' }}>
+            Paste from Word — formatting carries over automatically
+          </span>
+          {aiError && (
+            <span style={{ fontSize: 11, color: '#fca5a5' }}>{aiError}</span>
+          )}
+        </div>
+      </div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       <Toolbar
         state={state}
         selectedElement={selectedElement}
