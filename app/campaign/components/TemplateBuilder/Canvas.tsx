@@ -48,6 +48,7 @@ interface ContextMenuState {
   x: number;
   y: number;
   elementId: string;
+  type: 'table' | 'button';
 }
 
 function getResizeCursor(handle: ResizeHandle): string {
@@ -347,6 +348,112 @@ function TableContextMenu({ table, x, y, onClose, onUpdate }: TableContextMenuPr
   );
 }
 
+// ── Button properties context menu ────────────────────────────────────────
+
+interface ButtonContextMenuProps {
+  btn: ButtonElement;
+  x: number;
+  y: number;
+  onClose: () => void;
+  onUpdate: (patch: Partial<ButtonElement>) => void;
+}
+
+function ButtonContextMenu({ btn, x, y, onClose, onUpdate }: ButtonContextMenuProps) {
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onDown(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) onClose();
+    }
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose(); }
+    window.addEventListener('mousedown', onDown);
+    window.addEventListener('keydown', onKey);
+    return () => { window.removeEventListener('mousedown', onDown); window.removeEventListener('keydown', onKey); };
+  }, [onClose]);
+
+  const row = (label: string, control: React.ReactNode) => (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
+      <span style={{ fontSize: 11, color: '#6b7280', whiteSpace: 'nowrap', minWidth: 80 }}>{label}</span>
+      {control}
+    </div>
+  );
+
+  const colorInput = (val: string, onChange: (v: string) => void) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+      <input type="color" value={val} onChange={(e) => onChange(e.target.value)}
+        style={{ width: 28, height: 24, border: 'none', background: 'none', cursor: 'pointer', padding: 0 }} />
+      <input type="text" value={val} onChange={(e) => onChange(e.target.value)}
+        style={{ width: 72, padding: '3px 6px', borderRadius: 4, border: '1px solid #d1d5db', fontSize: 11, fontFamily: 'monospace' }} />
+    </div>
+  );
+
+  const numInput = (val: number, min: number, max: number, onChange: (v: number) => void) => (
+    <input type="number" value={val} min={min} max={max}
+      onChange={(e) => onChange(Math.min(max, Math.max(min, Number(e.target.value))))}
+      style={{ width: 56, padding: '3px 6px', borderRadius: 4, border: '1px solid #d1d5db', fontSize: 12, textAlign: 'center' }}
+    />
+  );
+
+  const section = (title: string) => (
+    <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '10px 0 6px' }}>
+      {title}
+    </div>
+  );
+
+  const menuStyle: React.CSSProperties = {
+    position: 'fixed',
+    left: Math.min(x, window.innerWidth - 280),
+    top: Math.min(y, window.innerHeight - 380),
+    width: 264,
+    background: '#ffffff',
+    border: '1px solid #e5e7eb',
+    borderRadius: 10,
+    boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+    zIndex: 9000,
+    padding: '10px 14px 14px',
+    fontFamily: 'Inter, Arial, sans-serif',
+  };
+
+  return (
+    <div ref={menuRef} style={menuStyle} onMouseDown={(e) => e.stopPropagation()}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: '#111827' }}>Button Properties</span>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: 16, lineHeight: 1, padding: '0 2px' }}>×</button>
+      </div>
+
+      {section('Link')}
+      <div style={{ marginBottom: 8 }}>
+        <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 3 }}>Label</div>
+        <input
+          type="text"
+          value={btn.label}
+          onChange={(e) => onUpdate({ label: e.target.value })}
+          style={{ width: '100%', boxSizing: 'border-box', padding: '4px 8px', borderRadius: 4, border: '1px solid #d1d5db', fontSize: 12 }}
+        />
+      </div>
+      <div style={{ marginBottom: 8 }}>
+        <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 3 }}>URL</div>
+        <input
+          type="text"
+          value={btn.href}
+          onChange={(e) => onUpdate({ href: e.target.value })}
+          placeholder="https://"
+          style={{ width: '100%', boxSizing: 'border-box', padding: '4px 8px', borderRadius: 4, border: '1px solid #d1d5db', fontSize: 12, fontFamily: 'monospace' }}
+        />
+      </div>
+
+      {section('Colors')}
+      {row('Background', colorInput(btn.bgColor, (v) => onUpdate({ bgColor: v })))}
+      {row('Text color', colorInput(btn.textColor, (v) => onUpdate({ textColor: v })))}
+
+      {section('Style')}
+      {row('Font size', numInput(btn.fontSize, 8, 48, (v) => onUpdate({ fontSize: v })))}
+      {row('Border radius', numInput(btn.borderRadius, 0, 50, (v) => onUpdate({ borderRadius: v })))}
+    </div>
+  );
+}
+
+
 const btnSmall: React.CSSProperties = {
   width: 22, height: 22, borderRadius: 4, border: '1px solid #d1d5db',
   background: '#f9fafb', cursor: 'pointer', fontSize: 14, lineHeight: 1,
@@ -409,11 +516,11 @@ export function Canvas({ state, selectedId, isPreview, onSelect, onUpdate, onDel
   const handleContextMenu = useCallback(
     (e: React.MouseEvent, id: string) => {
       const el = state.elements.find((x) => x.id === id);
-      if (!el || el.type !== 'table' || isPreview) return;
+      if (!el || (el.type !== 'table' && el.type !== 'button') || isPreview) return;
       e.preventDefault();
       e.stopPropagation();
       onSelect(id);
-      setContextMenu({ x: e.clientX, y: e.clientY, elementId: id });
+      setContextMenu({ x: e.clientX, y: e.clientY, elementId: id, type: el.type as 'table' | 'button' });
     },
     [state.elements, onSelect, isPreview]
   );
@@ -514,8 +621,11 @@ export function Canvas({ state, selectedId, isPreview, onSelect, onUpdate, onDel
     userSelect: 'none',
   };
 
-  const contextTable = contextMenu
+  const contextTable = contextMenu?.type === 'table'
     ? (state.elements.find((e) => e.id === contextMenu.elementId) as TableElement | undefined)
+    : null;
+  const contextButton = contextMenu?.type === 'button'
+    ? (state.elements.find((e) => e.id === contextMenu.elementId) as ButtonElement | undefined)
     : null;
 
   return (
@@ -578,7 +688,7 @@ export function Canvas({ state, selectedId, isPreview, onSelect, onUpdate, onDel
                   </button>
                   <div style={{
                     position: 'absolute', top: -26, left: 0,
-                    background: el.locked ? '#f59e0b' : el.type === 'table' ? '#7c3aed' : '#0284c7',
+                    background: el.locked ? '#f59e0b' : el.type === 'table' ? '#7c3aed' : el.type === 'button' ? '#0284c7' : '#0284c7',
                     color: '#fff', borderRadius: 4, padding: '1px 6px',
                     fontSize: 10, display: 'flex', alignItems: 'center', gap: 3, pointerEvents: 'none',
                   }}>
@@ -586,7 +696,7 @@ export function Canvas({ state, selectedId, isPreview, onSelect, onUpdate, onDel
                       ? <LockIcon style={{ width: 10, height: 10 }} />
                       : <GripIcon style={{ width: 10, height: 10 }} />
                     }
-                    {el.type}{el.locked ? ' (locked)' : el.type === 'table' ? ' (right-click for options)' : ''}
+                    {el.type}{el.locked ? ' (locked)' : (el.type === 'table' || el.type === 'button') ? ' (right-click for options)' : ''}
                   </div>
                 </>
               )}
@@ -595,7 +705,7 @@ export function Canvas({ state, selectedId, isPreview, onSelect, onUpdate, onDel
         })}
       </div>
 
-      {/* Table context menu — rendered outside the canvas div to avoid clipping */}
+      {/* Table context menu */}
       {contextMenu && contextTable && (
         <TableContextMenu
           table={contextTable}
@@ -604,6 +714,19 @@ export function Canvas({ state, selectedId, isPreview, onSelect, onUpdate, onDel
           onClose={() => setContextMenu(null)}
           onUpdate={(patch) => {
             onUpdate({ ...contextTable, ...patch } as CanvasElement);
+          }}
+        />
+      )}
+
+      {/* Button context menu */}
+      {contextMenu && contextButton && (
+        <ButtonContextMenu
+          btn={contextButton}
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          onUpdate={(patch) => {
+            onUpdate({ ...contextButton, ...patch } as CanvasElement);
           }}
         />
       )}
