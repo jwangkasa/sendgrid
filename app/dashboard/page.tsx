@@ -22,6 +22,10 @@ import {
   DownloadIcon,
   SparklesIcon,
   PaintbrushIcon,
+  BuildingIcon,
+  MailPlusIcon,
+  LayoutDashboardIcon,
+  GitBranchIcon,
   CheckIcon,
 } from 'lucide-react';
 import { Logo } from '@/app/components/Logo';
@@ -322,27 +326,31 @@ function DashboardContent() {
               <Logo size="sm" />
               <span className="text-sm font-semibold text-gray-900 hidden sm:block">Campaign Analytics</span>
             </div>
-            <nav className="hidden md:flex items-center gap-1">
-              <button onClick={() => router.push('/vendors')} className="px-3 py-1.5 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 text-xs font-medium transition-colors">
+            <nav className="hidden md:flex items-center gap-0.5">
+              <button onClick={() => router.push('/vendors')} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 text-xs font-medium transition-colors">
+                <BuildingIcon className="w-3.5 h-3.5" />
                 Vendor Campaign
               </button>
-              <button onClick={() => router.push('/campaign')} className="px-3 py-1.5 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 text-xs font-medium transition-colors">
+              <button onClick={() => router.push('/campaign')} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 text-xs font-medium transition-colors">
+                <MailPlusIcon className="w-3.5 h-3.5" />
                 New Campaign
               </button>
-              <span className="px-3 py-1.5 rounded-lg bg-brand-50 border border-brand-200 text-brand-700 text-xs font-semibold">
+              <span className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-brand-50 border border-brand-200 text-brand-700 text-xs font-semibold">
+                <LayoutDashboardIcon className="w-3.5 h-3.5" />
                 Dashboard
               </span>
               <button
                 onClick={() => setBuilderOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 text-xs font-medium transition-colors"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 text-xs font-medium transition-colors"
               >
-                <PaintbrushIcon className="w-3 h-3" />
+                <PaintbrushIcon className="w-3.5 h-3.5" />
                 Template Builder
               </button>
               <button
                 onClick={() => router.push('/sequences')}
-                className="px-3 py-1.5 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 text-xs font-medium transition-colors"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 text-xs font-medium transition-colors"
               >
+                <GitBranchIcon className="w-3.5 h-3.5" />
                 Sequences
               </button>
             </nav>

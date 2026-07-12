@@ -8,7 +8,7 @@ import type { RowSelectionState } from '@tanstack/react-table';
 import type { VendorRow } from '@/app/api/vendors/route';
 import type { RecipientRow } from '@/lib/types';
 import { VendorTable } from './components/VendorTable';
-import { LogOutIcon, SendIcon, BuildingIcon, PaintbrushIcon, CheckIcon } from 'lucide-react';
+import { LogOutIcon, SendIcon, BuildingIcon, PaintbrushIcon, CheckIcon, MailPlusIcon, LayoutDashboardIcon, GitBranchIcon } from 'lucide-react';
 import { Logo } from '@/app/components/Logo';
 import { TemplateBuilder } from '@/app/campaign/components/TemplateBuilder';
 
@@ -162,22 +162,29 @@ export default function VendorsPage() {
             <Logo size="sm" />
             <span className="text-sm font-semibold text-gray-900">Bulk Email Engine</span>
           </div>
-          <nav className="hidden sm:flex items-center gap-1">
-            <span className="px-3 py-1.5 rounded-lg bg-brand-50 border border-brand-200 text-brand-700 text-xs font-semibold">
+          <nav className="hidden sm:flex items-center gap-0.5">
+            <span className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-brand-50 border border-brand-200 text-brand-700 text-xs font-semibold">
+              <BuildingIcon className="w-3.5 h-3.5" />
               Vendor Campaign
             </span>
-            <button onClick={() => router.push('/campaign')} className="px-3 py-1.5 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 text-xs font-medium transition-colors">
+            <button onClick={() => router.push('/campaign')} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 text-xs font-medium transition-colors">
+              <MailPlusIcon className="w-3.5 h-3.5" />
               New Campaign
             </button>
-            <button onClick={() => router.push('/dashboard')} className="px-3 py-1.5 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 text-xs font-medium transition-colors">
+            <button onClick={() => router.push('/dashboard')} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 text-xs font-medium transition-colors">
+              <LayoutDashboardIcon className="w-3.5 h-3.5" />
               Dashboard
             </button>
             <button
               onClick={() => setBuilderOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 text-xs font-medium transition-colors"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 text-xs font-medium transition-colors"
             >
-              <PaintbrushIcon className="w-3 h-3" />
+              <PaintbrushIcon className="w-3.5 h-3.5" />
               Template Builder
+            </button>
+            <button onClick={() => router.push('/sequences')} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 text-xs font-medium transition-colors">
+              <GitBranchIcon className="w-3.5 h-3.5" />
+              Sequences
             </button>
           </nav>
           <div className="flex items-center gap-4">

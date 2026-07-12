@@ -399,13 +399,13 @@ function TableContextMenu({ table, cellRow, cellCol, x, y, onClose, onUpdate, on
     onClose();
   }
 
-  const section = (title: string) => (
-    <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase' as const, letterSpacing: '0.06em', margin: '10px 0 5px', borderTop: '1px solid #f1f5f9', paddingTop: 8 }}>
+  const sectionLabel = (title: string) => (
+    <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase' as const, letterSpacing: '0.06em', marginTop: 10, marginBottom: 5 }}>
       {title}
     </div>
   );
 
-  const scopeToggle = (scope: 'cell' | 'table', setScope: (s: 'cell' | 'table') => void) => (
+  const scopeSelect = (scope: 'cell' | 'table', setScope: (s: 'cell' | 'table') => void) => (
     <select value={scope} onChange={(e) => setScope(e.target.value as 'cell' | 'table')}
       style={{ fontSize: 10, padding: '2px 4px', borderRadius: 3, border: '1px solid #d1d5db', background: '#f9fafb', cursor: 'pointer' }}>
       <option value="cell">This cell</option>
@@ -421,11 +421,14 @@ function TableContextMenu({ table, cellRow, cellCol, x, y, onClose, onUpdate, on
     </button>
   );
 
+  const rowStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 };
+  const labelStyle: React.CSSProperties = { fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', minWidth: 40, flexShrink: 0 };
+
   const menuStyle: React.CSSProperties = {
     position: 'fixed',
-    left: Math.min(x, window.innerWidth - 290),
-    top: Math.min(y, window.innerHeight - 600),
-    width: 272,
+    left: Math.min(x, window.innerWidth - 270),
+    top: Math.min(y, window.innerHeight - 580),
+    width: 260,
     background: '#ffffff',
     border: '1px solid #e5e7eb',
     borderRadius: 10,
@@ -433,90 +436,101 @@ function TableContextMenu({ table, cellRow, cellCol, x, y, onClose, onUpdate, on
     zIndex: 9000,
     padding: '10px 14px 14px',
     fontFamily: 'Inter, Arial, sans-serif',
-    maxHeight: '90vh',
-    overflowY: 'auto',
   };
 
   return (
     <div ref={menuRef} style={menuStyle} onMouseDown={(e) => e.stopPropagation()} onContextMenu={(e) => e.preventDefault()}>
+      {/* Title row */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
         <span style={{ fontSize: 12, fontWeight: 700, color: '#111827' }}>Cell ({cellRow + 1},{cellCol + 1})</span>
         <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: 16, lineHeight: 1, padding: '0 2px' }}>×</button>
       </div>
 
-      {/* BORDER */}
-      <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Border</span>
-          {scopeToggle(borderScope, setBorderScope)}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
-          <span style={{ fontSize: 11, color: '#6b7280', minWidth: 44 }}>Style</span>
-          <select value={bStyle} onChange={(e) => patchBorder({ borderStyle: e.target.value as BorderStyle })}
-            style={{ flex: 1, padding: '3px 6px', borderRadius: 4, border: '1px solid #d1d5db', fontSize: 12 }}>
-            <option value="solid">solid</option>
-            <option value="dashed">dashed</option>
-            <option value="dotted">dotted</option>
-            <option value="double">double</option>
-            <option value="none">none</option>
-          </select>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
-          <span style={{ fontSize: 11, color: '#6b7280', minWidth: 44 }}>Width</span>
-          <input type="range" min={0} max={8} value={bWidth}
-            onChange={(e) => patchBorder({ borderWidth: Number(e.target.value) })}
-            style={{ flex: 1 }} />
-          <span style={{ fontSize: 11, color: '#374151', minWidth: 24, textAlign: 'right' }}>{bWidth}px</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 11, color: '#6b7280', minWidth: 44 }}>Color</span>
-          <ColorRow label="" value={bColor} onChange={(v) => patchBorder({ borderColor: v })} />
-        </div>
+      {/* BORDER section */}
+      {sectionLabel('Border')}
+
+      {/* STYLE row */}
+      <div style={rowStyle}>
+        <span style={labelStyle}>Style</span>
+        <select value={bStyle} onChange={(e) => patchBorder({ borderStyle: e.target.value as BorderStyle })}
+          style={{ flex: 1, padding: '3px 6px', borderRadius: 4, border: '1px solid #d1d5db', fontSize: 11 }}>
+          <option value="solid">solid</option>
+          <option value="dashed">dashed</option>
+          <option value="dotted">dotted</option>
+          <option value="double">double</option>
+          <option value="none">none</option>
+        </select>
       </div>
 
-      {/* CELL BACKGROUND */}
-      {section('Cell Background')}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
-        <span style={{ fontSize: 11, color: '#6b7280' }}>Color</span>
-        {scopeToggle(bgScope, setBgScope)}
+      {/* WIDTH row */}
+      <div style={rowStyle}>
+        <span style={labelStyle}>Width</span>
+        <input type="range" min={0} max={8} value={bWidth}
+          onChange={(e) => patchBorder({ borderWidth: Number(e.target.value) })}
+          style={{ flex: 1, accentColor: '#3b82f6' }} />
+        <span style={{ fontSize: 11, color: '#374151', minWidth: 24, textAlign: 'right' as const }}>{bWidth}px</span>
       </div>
+
+      {/* COLOR row */}
+      <div style={rowStyle}>
+        <span style={labelStyle}>Color</span>
+        <label style={{ width: 18, height: 18, borderRadius: 3, border: '1px solid #d1d5db', background: bColor, cursor: 'pointer', flexShrink: 0, display: 'block', overflow: 'hidden', position: 'relative' }}>
+          <input type="color" value={bColor || '#000000'} onChange={(e) => patchBorder({ borderColor: e.target.value })}
+            style={{ position: 'absolute', inset: 0, opacity: 0, width: '100%', height: '100%', cursor: 'pointer', padding: 0, border: 'none' }} />
+        </label>
+        {scopeSelect(borderScope, setBorderScope)}
+      </div>
+
+      {/* CELL BACKGROUND section */}
+      {sectionLabel('Cell Background')}
       <ColorSwatches value={bgColor} onChange={(v) => patchBg({ bgColor: v })} />
-      <ColorRow label="Custom" value={bgColor} onChange={(v) => patchBg({ bgColor: v })} />
 
-      {/* TEXT COLOR */}
-      {section('Text Color')}
-      <ColorSwatches value={txtColor} onChange={(v) => patchCell({ textColor: v })} />
-      <ColorRow label="Custom" value={txtColor} onChange={(v) => patchCell({ textColor: v })} />
-
-      {/* CELL ALIGNMENT */}
-      {section('Cell Alignment')}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        {/* 3×3 grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 24px)', gap: 3 }}>
-          {ALIGN_GRID.map(({ halign, valign }) => {
-            const active = halign === hAlign && valign === vAlign;
-            return (
-              <button key={`${halign}-${valign}`}
-                onClick={() => patchCell({ align: halign, verticalAlign: valign })}
-                style={{ width: 24, height: 24, border: active ? '1.5px solid #3b82f6' : '1px solid #d1d5db', borderRadius: 4, background: active ? '#eff6ff' : '#f9fafb', cursor: 'pointer', padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <AlignIcon halign={halign} valign={valign} active={active} />
-              </button>
-            );
-          })}
-        </div>
-        {/* vertical-only quick buttons */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-          {(['top','middle','bottom'] as const).map((v) => (
-            <button key={v} onClick={() => patchCell({ verticalAlign: v })}
-              style={{ width: 24, height: 24, border: vAlign === v ? '1.5px solid #3b82f6' : '1px solid #d1d5db', borderRadius: 4, background: vAlign === v ? '#eff6ff' : '#f9fafb', cursor: 'pointer', padding: 2, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', color: vAlign === v ? '#1d4ed8' : '#6b7280' }}>
-              {v === 'top' ? '↑' : v === 'middle' ? '↕' : '↓'}
-            </button>
-          ))}
-        </div>
+      {/* CUSTOM row for bg */}
+      <div style={rowStyle}>
+        <span style={labelStyle}>Custom</span>
+        <label style={{ width: 18, height: 18, borderRadius: 3, border: '1px solid #d1d5db', background: bgColor, cursor: 'pointer', flexShrink: 0, display: 'block', overflow: 'hidden', position: 'relative' }}>
+          <input type="color" value={bgColor || '#ffffff'} onChange={(e) => patchBg({ bgColor: e.target.value })}
+            style={{ position: 'absolute', inset: 0, opacity: 0, width: '100%', height: '100%', cursor: 'pointer', padding: 0, border: 'none' }} />
+        </label>
+        {scopeSelect(bgScope, setBgScope)}
       </div>
 
-      {/* ROWS & COLUMNS */}
-      {section('Rows & Columns')}
+      {/* TEXT COLOR section */}
+      {sectionLabel('Text Color')}
+      <ColorSwatches value={txtColor} onChange={(v) => patchCell({ textColor: v })} />
+
+      {/* CUSTOM row for text color — no scope dropdown */}
+      <div style={rowStyle}>
+        <span style={labelStyle}>Custom</span>
+        <label style={{ width: 18, height: 18, borderRadius: 3, border: '1px solid #d1d5db', background: txtColor, cursor: 'pointer', flexShrink: 0, display: 'block', overflow: 'hidden', position: 'relative' }}>
+          <input type="color" value={txtColor || '#111827'} onChange={(e) => patchCell({ textColor: e.target.value })}
+            style={{ position: 'absolute', inset: 0, opacity: 0, width: '100%', height: '100%', cursor: 'pointer', padding: 0, border: 'none' }} />
+        </label>
+      </div>
+
+      {/* CELL ALIGNMENT section */}
+      {sectionLabel('Cell Alignment')}
+      {/* Single row: 3 horizontal align buttons + 3 vertical align buttons */}
+      <div style={{ display: 'flex', gap: 4 }}>
+        {(['left', 'center', 'right'] as const).map((h) => {
+          const active = h === hAlign;
+          return (
+            <button key={h} onClick={() => patchCell({ align: h })}
+              style={{ width: 24, height: 24, border: active ? '1.5px solid #3b82f6' : '1px solid #d1d5db', borderRadius: 4, background: active ? '#eff6ff' : '#f9fafb', cursor: 'pointer', padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <AlignIcon halign={h} valign="middle" active={active} />
+            </button>
+          );
+        })}
+        {(['top', 'middle', 'bottom'] as const).map((v) => (
+          <button key={v} onClick={() => patchCell({ verticalAlign: v })}
+            style={{ width: 24, height: 24, border: vAlign === v ? '1.5px solid #3b82f6' : '1px solid #d1d5db', borderRadius: 4, background: vAlign === v ? '#eff6ff' : '#f9fafb', cursor: 'pointer', padding: 2, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', color: vAlign === v ? '#1d4ed8' : '#6b7280' }}>
+            {v === 'top' ? '↑' : v === 'middle' ? '↕' : '↓'}
+          </button>
+        ))}
+      </div>
+
+      {/* ROWS & COLUMNS section */}
+      {sectionLabel('Rows & Columns')}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
         {actionBtn('Insert row above', '↑', insertRowAbove)}
         {actionBtn('Insert row below', '↓', insertRowBelow)}
