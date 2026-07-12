@@ -60,7 +60,7 @@ export async function runSequence(
 
   // Load sequence
   const seqRows = await query<{ FLOW_JSON: string }>(
-    `SELECT FLOW_JSON FROM SEQUENCES WHERE ID = ?`, [sequenceId],
+    `SELECT FLOW_JSON FROM "HATCH"."SEQUENCES" WHERE ID = ?`, [sequenceId],
   );
   if (!seqRows.rows[0]) return result;
   const flow = JSON.parse(seqRows.rows[0].FLOW_JSON) as SequenceFlow;
@@ -69,7 +69,7 @@ export async function runSequence(
   const now = new Date();
   const enrollments = await query<Enrollment>(
     `SELECT ID, EMAIL_ADDRESS, CURRENT_NODE, NEXT_RUN_AT, LAST_BATCH_ID, METADATA
-       FROM SEQUENCE_ENROLLMENTS
+       FROM "HATCH"."SEQUENCE_ENROLLMENTS"
       WHERE SEQUENCE_ID = ? AND STATUS = 'active' AND NEXT_RUN_AT <= ?`,
     [sequenceId, now.toISOString()],
   );
@@ -138,14 +138,14 @@ export async function runSequence(
 
       if (completed) {
         await query(
-          `UPDATE SEQUENCE_ENROLLMENTS SET STATUS = 'completed', UPDATED_AT = CURRENT_TIMESTAMP WHERE ID = ?`,
+          `UPDATE "HATCH"."SEQUENCE_ENROLLMENTS" SET STATUS = 'completed', UPDATED_AT = CURRENT_TIMESTAMP WHERE ID = ?`,
           [enrollment.ID],
         );
         result.completed++;
       } else {
         const scheduleAt = nextRunAt ?? now;
         await query(
-          `UPDATE SEQUENCE_ENROLLMENTS
+          `UPDATE "HATCH"."SEQUENCE_ENROLLMENTS"
              SET CURRENT_NODE = ?, LAST_BATCH_ID = COALESCE(?, LAST_BATCH_ID),
                  NEXT_RUN_AT = ?, UPDATED_AT = CURRENT_TIMESTAMP
            WHERE ID = ?`,
@@ -156,7 +156,7 @@ export async function runSequence(
       console.error(`[sequenceEngine] error processing enrollment ${enrollment.ID}:`, err);
       result.errors++;
       await query(
-        `UPDATE SEQUENCE_ENROLLMENTS SET STATUS = 'error', UPDATED_AT = CURRENT_TIMESTAMP WHERE ID = ?`,
+        `UPDATE "HATCH"."SEQUENCE_ENROLLMENTS" SET STATUS = 'error', UPDATED_AT = CURRENT_TIMESTAMP WHERE ID = ?`,
         [enrollment.ID],
       ).catch(() => {/* non-fatal */});
     }

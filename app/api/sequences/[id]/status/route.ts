@@ -10,21 +10,26 @@ export async function GET(req: NextRequest, ctx: Ctx) {
 
   const { id } = await ctx.params;
 
-  const rows = await query<{ CURRENT_NODE: string; STATUS: string; CNT: number }>(
-    `SELECT CURRENT_NODE, STATUS, COUNT(*) AS CNT
-       FROM SEQUENCE_ENROLLMENTS
-      WHERE SEQUENCE_ID = ?
-      GROUP BY CURRENT_NODE, STATUS`,
-    [id],
-  );
+  try {
+    const rows = await query<{ CURRENT_NODE: string; STATUS: string; CNT: number }>(
+      `SELECT CURRENT_NODE, STATUS, COUNT(*) AS CNT
+         FROM "HATCH"."SEQUENCE_ENROLLMENTS"
+        WHERE SEQUENCE_ID = ?
+        GROUP BY CURRENT_NODE, STATUS`,
+      [id],
+    );
 
-  const totals = await query<{ STATUS: string; CNT: number }>(
-    `SELECT STATUS, COUNT(*) AS CNT
-       FROM SEQUENCE_ENROLLMENTS
-      WHERE SEQUENCE_ID = ?
-      GROUP BY STATUS`,
-    [id],
-  );
+    const totals = await query<{ STATUS: string; CNT: number }>(
+      `SELECT STATUS, COUNT(*) AS CNT
+         FROM "HATCH"."SEQUENCE_ENROLLMENTS"
+        WHERE SEQUENCE_ID = ?
+        GROUP BY STATUS`,
+      [id],
+    );
 
-  return NextResponse.json({ byNode: rows.rows, totals: totals.rows });
+    return NextResponse.json({ byNode: rows.rows, totals: totals.rows });
+  } catch (e) {
+    console.error('[GET /api/sequences/[id]/status]', e);
+    return NextResponse.json({ message: 'Database error' }, { status: 500 });
+  }
 }

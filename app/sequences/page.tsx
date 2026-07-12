@@ -39,8 +39,11 @@ export default function SequencesPage() {
   useEffect(() => {
     if (!idToken) return;
     fetch('/api/sequences', { headers: { Authorization: `Bearer ${idToken}` } })
-      .then((r) => r.json())
-      .then((d: { sequences?: SequenceSummary[] }) => setSequences(d.sequences ?? []))
+      .then(async (r) => {
+        if (!r.ok) return;
+        const d = await r.json() as { sequences?: SequenceSummary[] };
+        setSequences(d.sequences ?? []);
+      })
       .finally(() => setLoading(false));
   }, [idToken]);
 

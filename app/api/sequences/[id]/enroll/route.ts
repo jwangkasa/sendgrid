@@ -12,44 +12,46 @@ export async function POST(req: NextRequest, ctx: Ctx) {
 
   const { id } = await ctx.params;
 
-  // Load sequence to find the start node
-  const seqRows = await query<{ FLOW_JSON: string }>(
-    `SELECT FLOW_JSON FROM SEQUENCES WHERE ID = ?`, [id],
-  );
-  if (!seqRows.rows[0]) return NextResponse.json({ message: 'Sequence not found' }, { status: 404 });
-  const flow = JSON.parse(seqRows.rows[0].FLOW_JSON) as SequenceFlow;
-  const startNode = flow.nodes.find((n) => n.type === 'start');
-  if (!startNode) return NextResponse.json({ message: 'Sequence has no Start node' }, { status: 400 });
-
-  // Find the node after start
-  const firstEdge = flow.edges.find((e) => e.source === startNode.id);
-  const firstNodeId = firstEdge?.target ?? startNode.id;
-
-  const { recipients } = await req.json() as { recipients: RecipientRow[] };
-  if (!Array.isArray(recipients) || recipients.length === 0) {
-    return NextResponse.json({ message: 'recipients array required' }, { status: 400 });
-  }
-
-  const now = new Date().toISOString();
-  let enrolled = 0;
-
-  for (const recipient of recipients) {
-    if (!recipient.EMAIL_ADDRESS) continue;
-    // Skip if already enrolled and active
-    const existing = await query<{ ID: string }>(
-      `SELECT ID FROM SEQUENCE_ENROLLMENTS WHERE SEQUENCE_ID = ? AND EMAIL_ADDRESS = ? AND STATUS = 'active'`,
-      [id, recipient.EMAIL_ADDRESS],
+  try {
+    const seqRows = await query<{ FLOW_JSON: string }>(
+      `SELECT FLOW_JSON FROM "HATCH"."SEQUENCES" WHERE ID = ?`, [id],
     );
-    if (existing.rows.length > 0) continue;
+    if (!seqRows.rows[0]) return NextResponse.json({ message: 'Sequence not found' }, { status: 404 });
+    const flow = JSON.parse(seqRows.rows[0].FLOW_JSON) as SequenceFlow;
+    const startNode = flow.nodes.find((n) => n.type === 'start');
+    if (!startNode) return NextResponse.json({ message: 'Sequence has no Start node' }, { status: 400 });
 
-    await query(
-      `INSERT INTO SEQUENCE_ENROLLMENTS
-         (ID, SEQUENCE_ID, EMAIL_ADDRESS, CURRENT_NODE, STATUS, NEXT_RUN_AT, METADATA)
-       VALUES (?, ?, ?, ?, 'active', ?, ?)`,
-      [uuidv4(), id, recipient.EMAIL_ADDRESS, firstNodeId, now, JSON.stringify(recipient)],
-    );
-    enrolled++;
+    const firstEdge = flow.edges.find((e) => e.source === startNode.id);
+    const firstNodeId = firstEdge?.target ?? startNode.id;
+
+    const { recipients } = await req.json() as { recipients: RecipientRow[] };
+    if (!Array.isArray(recipients) || recipients.length === 0) {
+      return NextResponse.json({ message: 'recipients array required' }, { status: 400 });
+    }
+
+    const now = new Date().toISOString();
+    let enrolled = 0;
+
+    for (const recipient of recipients) {
+      if (!recipient.EMAIL_ADDRESS) continue;
+      const existing = await query<{ ID: string }>(
+        `SELECT ID FROM "HATCH"."SEQUENCE_ENROLLMENTS" WHERE SEQUENCE_ID = ? AND EMAIL_ADDRESS = ? AND STATUS = 'active'`,
+        [id, recipient.EMAIL_ADDRESS],
+      );
+      if (existing.rows.length > 0) continue;
+
+      await query(
+        `INSERT INTO "HATCH"."SEQUENCE_ENROLLMENTS"
+           (ID, SEQUENCE_ID, EMAIL_ADDRESS, CURRENT_NODE, STATUS, NEXT_RUN_AT, METADATA)
+         VALUES (?, ?, ?, ?, 'active', ?, ?)`,
+        [uuidv4(), id, recipient.EMAIL_ADDRESS, firstNodeId, now, JSON.stringify(recipient)],
+      );
+      enrolled++;
+    }
+
+    return NextResponse.json({ enrolled });
+  } catch (e) {
+    console.error('[POST /api/sequences/[id]/enroll]', e);
+    return NextResponse.json({ message: 'Database error' }, { status: 500 });
   }
-
-  return NextResponse.json({ enrolled });
 }
