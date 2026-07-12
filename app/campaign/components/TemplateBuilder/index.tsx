@@ -309,6 +309,21 @@ export function TemplateBuilder({ onApply, onClose, idToken, columnHeaders }: Te
         @media (max-width: 600px) { .ai-bar-inner { flex-direction: column; align-items: stretch; } }
       `}</style>
 
+      {/* Page header */}
+      <div style={{
+        background: 'linear-gradient(135deg, #0f52ba 0%, #1a6fd4 50%, #3a8ce0 100%)',
+        padding: '14px 20px',
+        borderBottom: '1px solid rgba(255,255,255,0.15)',
+        flexShrink: 0,
+      }}>
+        <h1 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#ffffff', letterSpacing: '-0.01em' }}>
+          Template Builder
+        </h1>
+        <p style={{ margin: '3px 0 0', fontSize: 12, color: 'rgba(214,234,255,0.85)', lineHeight: 1.4 }}>
+          Use the following functionalities to create the template to be used for your campaigns
+        </p>
+      </div>
+
       <Toolbar
         state={state}
         selectedElement={selectedElement}
