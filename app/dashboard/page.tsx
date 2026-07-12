@@ -339,6 +339,12 @@ function DashboardContent() {
                 <PaintbrushIcon className="w-3 h-3" />
                 Template Builder
               </button>
+              <button
+                onClick={() => router.push('/sequences')}
+                className="px-3 py-1.5 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 text-xs font-medium transition-colors"
+              >
+                Sequences
+              </button>
             </nav>
           </div>
 

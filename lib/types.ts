@@ -174,3 +174,77 @@ export type SendGridEventType =
   | 'unsubscribe'
   | 'group_unsubscribe'
   | 'group_resubscribe';
+
+// ─── Sequence automation types ────────────────────────────────────────────────
+
+export type SequenceNodeType = 'start' | 'email' | 'wait' | 'condition' | 'end';
+export type SequenceStatus = 'draft' | 'active' | 'paused';
+export type EnrollmentStatus = 'active' | 'completed' | 'error';
+
+export interface SequenceNodeData {
+  label?: string;
+  // start
+  batchId?: string;
+  // email
+  template?: EmailTemplate;
+  aiPrompt?: string;
+  // wait
+  days?: number;
+  date?: string | null;
+  // condition
+  field?: 'DELIVERY_STATUS';
+  op?: 'in' | 'not_in';
+  value?: string[];
+  // index signature required by React Flow
+  [key: string]: unknown;
+}
+
+export interface SequenceNode {
+  id: string;
+  type: SequenceNodeType;
+  position: { x: number; y: number };
+  data: SequenceNodeData;
+}
+
+export interface SequenceEdge {
+  id: string;
+  source: string;
+  target: string;
+  sourceHandle?: string | null;
+  label?: string;  // 'yes' | 'no' for condition edges
+}
+
+export interface SequenceFlow {
+  nodes: SequenceNode[];
+  edges: SequenceEdge[];
+}
+
+export interface Sequence {
+  id: string;
+  name: string;
+  ownerUid: string;
+  flow: SequenceFlow;
+  status: SequenceStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SequenceEnrollment {
+  id: string;
+  sequenceId: string;
+  emailAddress: string;
+  currentNode: string;
+  status: EnrollmentStatus;
+  nextRunAt: string;
+  lastBatchId: string | null;
+  metadata: RecipientRow | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SequenceRunResult {
+  processed: number;
+  emailsSent: number;
+  completed: number;
+  errors: number;
+}
