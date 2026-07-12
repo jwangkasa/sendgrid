@@ -229,10 +229,35 @@ export function NodeConfigPanel({ node, idToken, onUpdate, onDelete, onClose }: 
                   <input ref={jsonRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleJsonUpload} />
                 </div>
                 {d.template?.htmlBody ? (
-                  <div style={{ padding: 8, background: '#f0fdf4', borderRadius: 6, fontSize: 10, color: '#166534', display: 'flex', alignItems: 'center', gap: 4 }}>
-                    ✓ Template set ({d.template.htmlBody.length} chars)
-                    <button onClick={() => onUpdate(node.id, { template: { subject: d.template?.subject ?? '', htmlBody: '', textBody: '', fromEmail: d.template?.fromEmail ?? '', fromName: d.template?.fromName ?? '' } })} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626', fontSize: 10 }}>Clear</button>
-                  </div>
+                  <>
+                    <div style={{ padding: '6px 8px', background: '#f0fdf4', borderRadius: 6, fontSize: 10, color: '#166534', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 8 }}>
+                      ✓ Template set ({d.template.htmlBody.length} chars)
+                      <button onClick={() => onUpdate(node.id, { template: { subject: d.template?.subject ?? '', htmlBody: '', textBody: '', fromEmail: d.template?.fromEmail ?? '', fromName: d.template?.fromName ?? '' } })} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626', fontSize: 10 }}>Clear</button>
+                    </div>
+                    {/* Body preview */}
+                    <div style={{ border: '1px solid #e2e8f0', borderRadius: 6, overflow: 'hidden', marginBottom: 8 }}>
+                      <div style={{ padding: '4px 8px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: 9, fontWeight: 700, color: '#64748b', letterSpacing: '0.06em', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        PREVIEW
+                        <button
+                          onClick={() => {
+                            const blob = new Blob([d.template!.htmlBody], { type: 'text/html' });
+                            const url = URL.createObjectURL(blob);
+                            window.open(url, '_blank');
+                            setTimeout(() => URL.revokeObjectURL(url), 60000);
+                          }}
+                          style={{ background: '#6366f1', border: 'none', borderRadius: 4, padding: '2px 8px', color: '#fff', fontSize: 9, fontWeight: 700, cursor: 'pointer' }}
+                        >
+                          ↗ Preview Email
+                        </button>
+                      </div>
+                      <iframe
+                        srcDoc={d.template.htmlBody}
+                        style={{ width: '100%', height: 200, border: 'none', display: 'block' }}
+                        sandbox="allow-same-origin"
+                        title="Email preview"
+                      />
+                    </div>
+                  </>
                 ) : (
                   <div style={{ padding: 8, background: '#fffbeb', borderRadius: 6, fontSize: 10, color: '#92400e' }}>
                     ⚠ No body set — use Template Builder, upload JSON, or Write with AI above
