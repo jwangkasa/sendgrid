@@ -184,3 +184,25 @@ ${gtmNoscript ? gtmNoscript + '\n' : ''}  <table width="100%" cellpadding="0" ce
 </body>
 </html>`;
 }
+
+/** Body-only export for injecting into the campaign HTML textarea.
+ *  Returns just the outer wrapper table — no <!DOCTYPE>, <head>, or <body> tags. */
+export function exportBodyHtml(state: TemplateState): string {
+  const w = state.canvasWidth ?? 600;
+  const sorted = [...state.elements].sort((a, b) => a.y - b.y);
+  const rows = sorted.map(renderElement).join('\n');
+  const bodyBgStyle = state.backgroundImage
+    ? `background-image:url(${state.backgroundImage});background-size:cover;background-position:center;`
+    : '';
+
+  return `<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f4f4f5;${bodyBgStyle}">
+  <tr>
+    <td align="center" style="padding:24px 0;">
+      <table width="${w}" cellpadding="0" cellspacing="0" border="0"
+             style="width:${w}px;background:${state.canvasBackground};border-radius:6px;overflow:hidden;">
+        ${rows}
+      </table>
+    </td>
+  </tr>
+</table>`;
+}

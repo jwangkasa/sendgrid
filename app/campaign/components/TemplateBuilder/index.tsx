@@ -4,8 +4,8 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { Canvas } from './Canvas';
 import { Toolbar } from './Toolbar';
 import { ElementsPanel } from './ElementsPanel';
-import { exportHtml } from './htmlExporter';
 import type { CanvasElement, TemplateState, TextElement, ButtonElement, TrackingScript } from './types';
+import { exportBodyHtml } from './htmlExporter';
 
 const INITIAL_STATE: TemplateState = {
   elements: [],
@@ -269,7 +269,7 @@ export function TemplateBuilder({ onApply, onClose, idToken, columnHeaders }: Te
     rerender();
   }, [rerender]);
 
-  const handleApply = useCallback(() => onApply(exportHtml(cur())), [onApply, cur]);
+  const handleApply = useCallback(() => onApply(exportBodyHtml(cur())), [onApply, cur]);
 
   // Keyboard shortcuts
   useEffect(() => {
