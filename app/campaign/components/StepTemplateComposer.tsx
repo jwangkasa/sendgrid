@@ -11,7 +11,6 @@ import {
   InfoIcon,
   UserIcon,
   PaintbrushIcon,
-  EyeIcon,
 } from 'lucide-react';
 import { TemplateBuilder } from './TemplateBuilder';
 
@@ -165,33 +164,6 @@ export function StepTemplateComposer({
     unknownTokens.length === 0 &&
     fromEmail.trim().length > 0;
 
-  const handlePreview = () => {
-    const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Email Preview</title>
-  <style>body{margin:0;padding:0;background:#e5e7eb;font-family:Arial,Helvetica,sans-serif;}
-  .preview-bar{background:#1e1b4b;color:#c7d2fe;font-size:12px;padding:10px 20px;display:flex;align-items:center;gap:16px;}
-  .preview-bar strong{color:#fff;}
-  </style>
-</head>
-<body>
-  <div class="preview-bar">
-    <strong>Email Preview</strong>
-    <span>Subject: ${subject || '(no subject)'}</span>
-    <span style="margin-left:auto;opacity:0.7;">Close this tab when done</span>
-  </div>
-  ${htmlBody}
-</body>
-</html>`;
-    const blob = new Blob([html], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    window.open(url, '_blank');
-    setTimeout(() => URL.revokeObjectURL(url), 60000);
-  };
-
   const handleContinue = () => {
     if (canProceed) {
       onComplete({ subject, htmlBody, textBody, fromEmail, fromName });
@@ -321,18 +293,7 @@ export function StepTemplateComposer({
 
             {/* Create Your Template button — visible only on HTML tab */}
             {activeTab === 'html' && (
-              <div className="flex justify-end gap-2">
-                {htmlBody.trim().length > 0 && (
-                  <button
-                    onClick={handlePreview}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
-                               bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200
-                               transition-colors"
-                  >
-                    <EyeIcon className="w-3.5 h-3.5" />
-                    Preview
-                  </button>
-                )}
+              <div className="flex justify-end">
                 <button
                   onClick={() => setBuilderOpen(true)}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
