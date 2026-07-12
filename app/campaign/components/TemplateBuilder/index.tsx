@@ -5,7 +5,7 @@ import { Canvas } from './Canvas';
 import { Toolbar } from './Toolbar';
 import { ElementsPanel } from './ElementsPanel';
 import { exportHtml } from './htmlExporter';
-import type { CanvasElement, TemplateState, TextElement, TableElement } from './types';
+import type { CanvasElement, TemplateState, TextElement } from './types';
 
 const INITIAL_STATE: TemplateState = {
   elements: [],
@@ -17,140 +17,208 @@ interface TemplateBuilderProps {
   onClose: () => void;
 }
 
+function nextY(elements: CanvasElement[]): number {
+  if (elements.length === 0) return 20;
+  return Math.max(...elements.map((e) => e.y + e.height)) + 10;
+}
+
 export function TemplateBuilder({ onApply, onClose }: TemplateBuilderProps) {
-  const [history, setHistory] = useState<TemplateState[]>([INITIAL_STATE]);
-  const [historyIndex, setHistoryIndex] = useState(0);
+  // Keep history in a ref so callbacks always see the latest value without
+  // needing to be recreated on every state change.
+  const historyRef = useRef<TemplateState[]>([INITIAL_STATE]);
+  const indexRef = useRef(0);
+
+  // A single counter forces re-renders when history changes.
+  const [tick, setTick] = useState(0);
+  const rerender = useCallback(() => setTick((t) => t + 1), []);
+
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showEmoji, setShowEmoji] = useState(false);
   const [showSymbol, setShowSymbol] = useState(false);
 
-  const state = history[historyIndex]!;
+  const state = historyRef.current[indexRef.current] ?? INITIAL_STATE;
 
-  function push(next: TemplateState) {
-    const newHistory = history.slice(0, historyIndex + 1).concat(next);
-    setHistory(newHistory);
-    setHistoryIndex(newHistory.length - 1);
-  }
-
-  const updateElements = useCallback((updater: (els: CanvasElement[]) => CanvasElement[]) => {
-    push({ ...state, elements: updater(state.elements) });
-  }, [state, historyIndex, history]);
+  const push = useCallback((next: TemplateState) => {
+    const truncated = historyRef.current.slice(0, indexRef.current + 1);
+    historyRef.current = [...truncated, next];
+    indexRef.current = historyRef.current.length - 1;
+    rerender();
+  }, [rerender]);
 
   const handleUpdate = useCallback((updated: CanvasElement) => {
+    const cur = historyRef.current[indexRef.current] ?? INITIAL_STATE;
     push({
-      ...state,
-      elements: state.elements.map((el) => el.id === updated.id ? updated : el),
+      ...cur,
+      elements: cur.elements.map((el) => el.id === updated.id ? updated : el),
     });
-  }, [state, historyIndex, history]);
+  }, [push]);
 
   const handleDelete = useCallback((id: string) => {
-    push({ ...state, elements: state.elements.filter((el) => el.id !== id) });
+    const cur = historyRef.current[indexRef.current] ?? INITIAL_STATE;
+    push({ ...cur, elements: cur.elements.filter((el) => el.id !== id) });
     setSelectedId(null);
-  }, [state, historyIndex, history]);
+  }, [push]);
 
   const handleAdd = useCallback((el: CanvasElement) => {
-    push({ ...state, elements: [...state.elements, el] });
-  }, [state, historyIndex, history]);
+    const cur = historyRef.current[indexRef.current] ?? INITIAL_STATE;
+    push({ ...cur, elements: [...cur.elements, el] });
+  }, [push]);
+
+  const handleUpdateSelected = useCallback((patch: Partial<CanvasElement>) => {
+    const cur = historyRef.current[indexRef.current] ?? INITIAL_STATE;
+    setSelectedId((selId) => {
+      if (!selId) return selId;
+      push({
+        ...cur,
+        elements: cur.elements.map((el) =>
+          el.id === selId ? { ...el, ...patch } as CanvasElement : el
+        ),
+      });
+      return selId;
+    });
+  }, [push]);
 
   const selectedElement = state.elements.find((el) => el.id === selectedId) ?? null;
 
-  const handleUpdateSelected = useCallback((patch: Partial<CanvasElement>) => {
-    if (!selectedId) return;
-    push({
-      ...state,
-      elements: state.elements.map((el) => el.id === selectedId ? { ...el, ...patch } as CanvasElement : el),
-    });
-  }, [selectedId, state, historyIndex, history]);
-
-  function handleInsertDivider() {
+  const handleInsertDivider = useCallback(() => {
+    const cur = historyRef.current[indexRef.current] ?? INITIAL_STATE;
     const id = `el-${Date.now()}`;
     handleAdd({
       id, type: 'divider',
-      x: 20, y: Math.max(0, ...state.elements.map((e) => e.y + e.height)) + 10,
+      x: 20, y: nextY(cur.elements),
       width: 560, height: 16, color: '#e5e7eb', thickness: 1,
     });
-  }
+  }, [handleAdd]);
 
-  function handleInsertTable(rows: number, cols: number) {
+  const handleInsertTable = useCallback((rows: number, cols: number) => {
+    const cur = historyRef.current[indexRef.current] ?? INITIAL_STATE;
     const id = `el-${Date.now()}`;
     handleAdd({
       id, type: 'table',
-      x: 20, y: Math.max(0, ...state.elements.map((e) => e.y + e.height)) + 10,
+      x: 20, y: nextY(cur.elements),
       width: 560, height: rows * 36,
       rows, cols,
-      cells: Array.from({ length: rows }, () => Array(cols).fill('')),
+      cells: Array.from({ length: rows }, () => Array(cols).fill('') as string[]),
       borderColor: '#d1d5db', borderWidth: 1, fontSize: 13,
     });
     setSelectedId(id);
-  }
+  }, [handleAdd]);
 
-  function handleUploadImage(src: string) {
+  const handleUploadImage = useCallback((src: string) => {
+    const cur = historyRef.current[indexRef.current] ?? INITIAL_STATE;
     const id = `el-${Date.now()}`;
     handleAdd({
       id, type: 'image',
-      x: 20, y: Math.max(0, ...state.elements.map((e) => e.y + e.height)) + 10,
+      x: 20, y: nextY(cur.elements),
       width: 200, height: 100, src, alt: 'image',
     });
     setSelectedId(id);
-  }
+  }, [handleAdd]);
 
-  function handleInsertEmoji(em: string) {
-    if (!selectedElement || selectedElement.type !== 'text') return;
-    const t = selectedElement as TextElement;
-    handleUpdateSelected({ content: t.content + em });
-  }
+  const handleInsertEmoji = useCallback((em: string) => {
+    setSelectedId((selId) => {
+      if (!selId) return selId;
+      const cur = historyRef.current[indexRef.current] ?? INITIAL_STATE;
+      const el = cur.elements.find((e) => e.id === selId);
+      if (!el || el.type !== 'text') return selId;
+      const t = el as TextElement;
+      push({
+        ...cur,
+        elements: cur.elements.map((e) =>
+          e.id === selId ? { ...t, content: t.content + em } : e
+        ),
+      });
+      return selId;
+    });
+  }, [push]);
 
-  function handleInsertSymbol(sym: string) {
-    if (!selectedElement || selectedElement.type !== 'text') return;
-    const t = selectedElement as TextElement;
-    handleUpdateSelected({ content: t.content + sym });
-  }
+  const handleInsertSymbol = useCallback((sym: string) => {
+    setSelectedId((selId) => {
+      if (!selId) return selId;
+      const cur = historyRef.current[indexRef.current] ?? INITIAL_STATE;
+      const el = cur.elements.find((e) => e.id === selId);
+      if (!el || el.type !== 'text') return selId;
+      const t = el as TextElement;
+      push({
+        ...cur,
+        elements: cur.elements.map((e) =>
+          e.id === selId ? { ...t, content: t.content + sym } : e
+        ),
+      });
+      return selId;
+    });
+  }, [push]);
 
-  function handleSaveJson() {
-    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const handleSaveJson = useCallback(() => {
+    const cur = historyRef.current[indexRef.current] ?? INITIAL_STATE;
+    const blob = new Blob([JSON.stringify(cur, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `email-template-${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
-  }
+  }, []);
 
-  function handleLoadJson(loaded: TemplateState) {
-    const newHistory = [loaded];
-    setHistory(newHistory);
-    setHistoryIndex(0);
+  const handleLoadJson = useCallback((loaded: TemplateState) => {
+    historyRef.current = [loaded];
+    indexRef.current = 0;
     setSelectedId(null);
-  }
+    rerender();
+  }, [rerender]);
 
-  function handleApply() {
-    onApply(exportHtml(state));
-  }
+  const handleApply = useCallback(() => {
+    const cur = historyRef.current[indexRef.current] ?? INITIAL_STATE;
+    onApply(exportHtml(cur));
+  }, [onApply]);
 
-  // Keyboard undo/redo
+  const handleSetBackground = useCallback((color: string) => {
+    const cur = historyRef.current[indexRef.current] ?? INITIAL_STATE;
+    push({ ...cur, canvasBackground: color });
+  }, [push]);
+
+  // Keyboard undo/redo/delete/escape
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const mod = e.ctrlKey || e.metaKey;
-      if (mod && e.key === 'z' && !e.shiftKey && historyIndex > 0) {
-        setHistoryIndex((i) => i - 1);
-        e.preventDefault();
+      if (mod && e.key === 'z' && !e.shiftKey) {
+        if (indexRef.current > 0) {
+          indexRef.current -= 1;
+          rerender();
+          e.preventDefault();
+        }
+        return;
       }
-      if (mod && (e.key === 'y' || (e.key === 'z' && e.shiftKey)) && historyIndex < history.length - 1) {
-        setHistoryIndex((i) => i + 1);
-        e.preventDefault();
+      if (mod && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+        if (indexRef.current < historyRef.current.length - 1) {
+          indexRef.current += 1;
+          rerender();
+          e.preventDefault();
+        }
+        return;
       }
-      if (e.key === 'Escape') onClose();
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId) {
+      if (e.key === 'Escape') { onClose(); return; }
+      if (e.key === 'Delete' || e.key === 'Backspace') {
         const tag = (document.activeElement as HTMLElement)?.tagName;
-        if (tag !== 'INPUT' && tag !== 'TEXTAREA' && !(document.activeElement as HTMLElement)?.isContentEditable) {
-          handleDelete(selectedId);
+        const isEditing =
+          tag === 'INPUT' ||
+          tag === 'TEXTAREA' ||
+          (document.activeElement as HTMLElement)?.isContentEditable;
+        if (!isEditing) {
+          setSelectedId((selId) => {
+            if (selId) handleDelete(selId);
+            return null;
+          });
           e.preventDefault();
         }
       }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [historyIndex, history.length, selectedId, handleDelete, onClose]);
+  }, [onClose, handleDelete, rerender]);
+
+  const canUndo = indexRef.current > 0;
+  const canRedo = indexRef.current < historyRef.current.length - 1;
 
   return (
     <div
@@ -161,27 +229,24 @@ export function TemplateBuilder({ onApply, onClose }: TemplateBuilderProps) {
         fontFamily: 'Inter, Arial, sans-serif',
       }}
     >
-      {/* Toolbar */}
       <Toolbar
         state={state}
         selectedElement={selectedElement}
-        canUndo={historyIndex > 0}
-        canRedo={historyIndex < history.length - 1}
-        onUndo={() => setHistoryIndex((i) => Math.max(0, i - 1))}
-        onRedo={() => setHistoryIndex((i) => Math.min(history.length - 1, i + 1))}
+        canUndo={canUndo}
+        canRedo={canRedo}
+        onUndo={() => { if (canUndo) { indexRef.current -= 1; rerender(); } }}
+        onRedo={() => { if (canRedo) { indexRef.current += 1; rerender(); } }}
         onUpdateSelected={handleUpdateSelected}
         onInsertDivider={handleInsertDivider}
         onInsertTable={handleInsertTable}
-        onSetBackground={(color) => push({ ...state, canvasBackground: color })}
+        onSetBackground={handleSetBackground}
         onSaveJson={handleSaveJson}
         onLoadJson={handleLoadJson}
         onClose={onClose}
         onApply={handleApply}
       />
 
-      {/* Body */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        {/* Left elements panel */}
         <ElementsPanel
           onInsertEmoji={handleInsertEmoji}
           onInsertSymbol={handleInsertSymbol}
@@ -192,14 +257,10 @@ export function TemplateBuilder({ onApply, onClose }: TemplateBuilderProps) {
           onUploadImage={handleUploadImage}
         />
 
-        {/* Canvas area */}
         <div
           style={{ flex: 1, overflowY: 'auto', padding: 32 }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setSelectedId(null);
-          }}
+          onClick={(e) => { if (e.target === e.currentTarget) setSelectedId(null); }}
         >
-          {/* Canvas title bar */}
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             maxWidth: 600, margin: '0 auto 10px',
