@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import type { CanvasElement, TextElement, TableElement, TemplateState, TrackingScript, ScriptType } from './types';
 import { exportHtml } from './htmlExporter';
+import { parseAndConvertJson } from './importConverter';
 
 const WIDTH_PRESETS = [
   { label: '600px — Email standard', value: 600 },
@@ -142,7 +143,7 @@ export function Toolbar({
     if (!f) return;
     const reader = new FileReader();
     reader.onload = (ev) => {
-      try { onLoadJson(JSON.parse(ev.target?.result as string) as TemplateState); }
+      try { onLoadJson(parseAndConvertJson(ev.target?.result as string)); }
       catch { alert('Invalid template JSON file.'); }
     };
     reader.readAsText(f);

@@ -250,18 +250,7 @@ export function TemplateBuilder({ onApply, onClose, idToken }: TemplateBuilderPr
   }, [cur]);
 
   const handleLoadJson = useCallback((loaded: TemplateState) => {
-    const safe: TemplateState = {
-      ...INITIAL_STATE,
-      ...loaded,
-      elements:        Array.isArray(loaded?.elements)        ? loaded.elements        : [],
-      trackingScripts: Array.isArray(loaded?.trackingScripts) ? loaded.trackingScripts : [],
-      canvasWidth:     typeof loaded?.canvasWidth === 'number' && loaded.canvasWidth > 0 ? loaded.canvasWidth : 600,
-      canvasBackground: loaded?.canvasBackground ?? '#ffffff',
-      showGrid:        loaded?.showGrid        ?? false,
-      gridSize:        loaded?.gridSize        ?? 20,
-      backgroundImage: loaded?.backgroundImage ?? '',
-    };
-    historyRef.current = [safe];
+    historyRef.current = [loaded];
     indexRef.current = 0;
     setSelectedId(null);
     rerender();
