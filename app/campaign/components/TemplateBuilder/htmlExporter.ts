@@ -69,17 +69,28 @@ function renderTable(el: TableElement): string {
     `font-size:${el.fontSize}px`,
   ].join(';');
   const pad = el.cellPadding ?? 6;
-  const baseCellStyle = `border:${el.borderWidth}px solid ${el.borderColor};padding:${pad}px ${pad + 2}px;`;
+  const globalBorder = `${el.borderWidth}px ${el.borderStyle ?? 'solid'} ${el.borderColor}`;
   let rows = '';
   for (let r = 0; r < el.rows; r++) {
     const isHeader = r === 0 && !!el.headerBgColor;
     let cells = '';
     for (let c = 0; c < el.cols; c++) {
       const content = el.cells[r]?.[c] ?? '';
-      const cellStyle = isHeader
-        ? `${baseCellStyle}background-color:${el.headerBgColor};font-weight:bold;`
-        : baseCellStyle;
-      cells += `<td style="${cellStyle}">${escapeHtml(content)}</td>`;
+      const cs = el.cellStyles?.[r]?.[c] ?? {};
+      const border = cs.borderStyle !== undefined || cs.borderWidth !== undefined || cs.borderColor !== undefined
+        ? `${cs.borderWidth ?? el.borderWidth}px ${cs.borderStyle ?? el.borderStyle ?? 'solid'} ${cs.borderColor ?? el.borderColor}`
+        : globalBorder;
+      const bg = cs.bgColor ?? (isHeader ? el.headerBgColor : undefined);
+      const styleArr = [
+        `border:${border}`,
+        `padding:${pad}px ${pad + 2}px`,
+        bg ? `background-color:${bg}` : '',
+        cs.textColor ? `color:${cs.textColor}` : '',
+        cs.align ? `text-align:${cs.align}` : '',
+        cs.verticalAlign ? `vertical-align:${cs.verticalAlign}` : '',
+        isHeader && !cs.textColor ? 'font-weight:bold' : '',
+      ].filter(Boolean).join(';');
+      cells += `<td style="${styleArr}">${escapeHtml(content)}</td>`;
     }
     rows += `<tr>${cells}</tr>`;
   }

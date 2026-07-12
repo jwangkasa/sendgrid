@@ -44,13 +44,28 @@ export interface DividerElement extends BaseElement {
   thickness: number;
 }
 
+export type BorderStyle = 'solid' | 'dashed' | 'dotted' | 'double' | 'none';
+export type VerticalAlign = 'top' | 'middle' | 'bottom';
+
+export interface CellStyle {
+  bgColor?: string;
+  textColor?: string;
+  align?: 'left' | 'center' | 'right';
+  verticalAlign?: VerticalAlign;
+  borderStyle?: BorderStyle;
+  borderWidth?: number;
+  borderColor?: string;
+}
+
 export interface TableElement extends BaseElement {
   type: 'table';
   rows: number;
   cols: number;
   cells: string[][];
+  cellStyles?: CellStyle[][];   // per-cell overrides [row][col]
   borderColor: string;
   borderWidth: number;
+  borderStyle?: BorderStyle;
   fontSize: number;
   cellPadding?: number;
   headerBgColor?: string;
