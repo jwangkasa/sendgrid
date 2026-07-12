@@ -349,6 +349,7 @@ export function TemplateBuilder({ onApply, onClose, idToken, columnHeaders }: Te
         onLoadJson={handleLoadJson}
         onClose={onClose}
         onApply={handleApply}
+        idToken={idToken}
       />
 
       {/* AI Content Generation Bar — below toolbar */}

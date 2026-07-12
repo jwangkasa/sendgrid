@@ -7,7 +7,7 @@ import {
   Undo2Icon, Redo2Icon, DownloadIcon, UploadIcon, CopyIcon, TableIcon,
   Minus, CheckIcon, PaletteIcon, GridIcon, Code2Icon, EyeIcon, EyeOffIcon,
   LockIcon, UnlockIcon, ArrowUpIcon, ArrowDownIcon, ImageIcon, XIcon,
-  PlusIcon, TrashIcon,
+  PlusIcon, TrashIcon, SendIcon,
 } from 'lucide-react';
 import type { CanvasElement, TextElement, TableElement, TemplateState, TrackingScript, ScriptType } from './types';
 import { exportBodyHtml } from './htmlExporter';
@@ -53,6 +53,7 @@ interface ToolbarProps {
   onLoadJson: (state: TemplateState) => void;
   onClose: () => void;
   onApply: () => void;
+  idToken?: string | null;
 }
 
 function Tip({ tip, children }: { tip: string; children: React.ReactNode }) {
@@ -108,7 +109,7 @@ export function Toolbar({
   onSetBackground, onSetCanvasWidth, onToggleGrid, onSetGridSize,
   onTogglePreview, onMoveUp, onMoveDown, onToggleLock,
   onUpdateTrackingScripts, onSetBackgroundImage,
-  onSaveJson, onLoadJson, onClose, onApply,
+  onSaveJson, onLoadJson, onClose, onApply, idToken,
 }: ToolbarProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const bgImgRef = useRef<HTMLInputElement>(null);
@@ -122,6 +123,11 @@ export function Toolbar({
   const [newScriptValue, setNewScriptValue] = useState('');
   const [newScriptName, setNewScriptName] = useState('Google Analytics 4');
   const [customWidth, setCustomWidth] = useState(state.canvasWidth);
+  const [showSendTest, setShowSendTest] = useState(false);
+  const [testTo, setTestTo] = useState('');
+  const [testSubject, setTestSubject] = useState('Email Preview');
+  const [testSending, setTestSending] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
 
   const isText = selectedElement?.type === 'text';
   const isTable = selectedElement?.type === 'table';
@@ -165,6 +171,32 @@ export function Toolbar({
     const url = URL.createObjectURL(blob);
     window.open(url, '_blank');
     setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }
+
+  async function handleSendTest() {
+    if (!testTo.trim() || !testSubject.trim()) return;
+    setTestSending(true);
+    setTestResult(null);
+    try {
+      const res = await fetch('/api/campaign/send-test', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+        },
+        body: JSON.stringify({ to: testTo.trim(), subject: testSubject.trim(), htmlBody: exportBodyHtml(state) }),
+      });
+      const data = await res.json() as { message?: string };
+      if (res.ok) {
+        setTestResult({ ok: true, msg: `Sent! Check ${testTo.trim()}` });
+      } else {
+        setTestResult({ ok: false, msg: data.message ?? `Error ${res.status}` });
+      }
+    } catch (err) {
+      setTestResult({ ok: false, msg: err instanceof Error ? err.message : 'Send failed' });
+    } finally {
+      setTestSending(false);
+    }
   }
 
   function handleLoadJson(e: React.ChangeEvent<HTMLInputElement>) {
@@ -302,6 +334,20 @@ export function Toolbar({
           }}>
             <EyeIcon style={{ width: 13, height: 13 }} />
             Preview in browser
+          </button>
+        </Tip>
+
+        <Tip tip="Send a test email to your inbox to preview in a real email client">
+          <button onClick={() => { setShowSendTest(true); setTestResult(null); }} style={{
+            display: 'flex', alignItems: 'center', gap: 5,
+            padding: '4px 8px', borderRadius: 5,
+            border: '1px solid #10b981',
+            background: 'linear-gradient(135deg,#ecfdf5,#d1fae5)',
+            cursor: 'pointer', fontSize: 11,
+            color: '#065f46', whiteSpace: 'nowrap',
+          }}>
+            <SendIcon style={{ width: 13, height: 13 }} />
+            Send Test Email
           </button>
         </Tip>
 
@@ -613,6 +659,56 @@ export function Toolbar({
                 Scripts are injected into the <code style={{ fontFamily: 'monospace', background: '#e0f2fe', padding: '1px 4px', borderRadius: 3 }}>&lt;head&gt;</code> of the exported HTML.
                 Only enabled scripts are included. Use "Copy HTML" or "Apply to Template" to get the final output.
               </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Send Test Email modal */}
+      {showSendTest && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowSendTest(false); }}>
+          <div style={{ background: '#fff', borderRadius: 10, padding: 24, width: 400, boxShadow: '0 20px 60px rgba(0,0,0,0.3)', fontFamily: 'Inter,Arial,sans-serif' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#111827' }}>Send Test Email</h3>
+              <button onClick={() => setShowSendTest(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
+                <XIcon style={{ width: 16, height: 16, color: '#6b7280' }} />
+              </button>
+            </div>
+            <p style={{ margin: '0 0 16px', fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
+              Send the current template to an email address so you can preview it in a real email client (Gmail, Outlook, etc).
+            </p>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 4 }}>Recipient email</label>
+            <input
+              type="email"
+              value={testTo}
+              onChange={(e) => setTestTo(e.target.value)}
+              placeholder="you@example.com"
+              style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13, marginBottom: 12, outline: 'none' }}
+            />
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 4 }}>Subject line</label>
+            <input
+              type="text"
+              value={testSubject}
+              onChange={(e) => setTestSubject(e.target.value)}
+              placeholder="Email Preview"
+              style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13, marginBottom: 16, outline: 'none' }}
+            />
+            {testResult && (
+              <div style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 6, background: testResult.ok ? '#d1fae5' : '#fee2e2', color: testResult.ok ? '#065f46' : '#991b1b', fontSize: 12 }}>
+                {testResult.msg}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => setShowSendTest(false)} style={{ padding: '7px 14px', borderRadius: 6, border: '1px solid #d1d5db', background: '#f9fafb', fontSize: 12, cursor: 'pointer', color: '#374151' }}>
+                Cancel
+              </button>
+              <button
+                onClick={() => { void handleSendTest(); }}
+                disabled={testSending || !testTo.trim() || !testSubject.trim()}
+                style={{ padding: '7px 16px', borderRadius: 6, border: 'none', background: testSending ? '#9ca3af' : '#10b981', fontSize: 12, fontWeight: 600, cursor: testSending ? 'not-allowed' : 'pointer', color: '#fff', display: 'flex', alignItems: 'center', gap: 6 }}>
+                {testSending ? 'Sending…' : <><SendIcon style={{ width: 12, height: 12 }} /> Send</>}
+              </button>
             </div>
           </div>
         </div>
