@@ -10,7 +10,9 @@ import {
   CheckIcon,
   InfoIcon,
   UserIcon,
+  PaintbrushIcon,
 } from 'lucide-react';
+import { TemplateBuilder } from './TemplateBuilder';
 
 // Token catalogue — maps to HANA column names used in interpolation
 const TOKENS: { token: string; description: string; example: string }[] = [
@@ -103,12 +105,13 @@ export function StepTemplateComposer({
   onComplete,
   onBack,
 }: StepTemplateComposerProps) {
-  const [subject,   setSubject]   = useState(initialTemplate.subject);
-  const [htmlBody,  setHtmlBody]  = useState(initialTemplate.htmlBody);
-  const [textBody,  setTextBody]  = useState(initialTemplate.textBody);
-  const [fromEmail, setFromEmail] = useState(initialTemplate.fromEmail);
-  const [fromName,  setFromName]  = useState(initialTemplate.fromName);
-  const [activeTab, setActiveTab] = useState<'html' | 'text'>('html');
+  const [subject,      setSubject]      = useState(initialTemplate.subject);
+  const [htmlBody,     setHtmlBody]     = useState(initialTemplate.htmlBody);
+  const [textBody,     setTextBody]     = useState(initialTemplate.textBody);
+  const [fromEmail,    setFromEmail]    = useState(initialTemplate.fromEmail);
+  const [fromName,     setFromName]     = useState(initialTemplate.fromName);
+  const [activeTab,    setActiveTab]    = useState<'html' | 'text'>('html');
+  const [builderOpen,  setBuilderOpen]  = useState(false);
 
   const [senders,       setSenders]       = useState<SenderOption[]>([]);
   const [sendersLoading, setSendersLoading] = useState(true);
@@ -286,6 +289,21 @@ export function StepTemplateComposer({
                          transition-colors resize-y min-h-[280px]"
             />
 
+            {/* Create Your Template button — visible only on HTML tab */}
+            {activeTab === 'html' && (
+              <div className="flex justify-end">
+                <button
+                  onClick={() => setBuilderOpen(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
+                             bg-brand-50 hover:bg-brand-100 text-brand-700 border border-brand-200
+                             transition-colors"
+                >
+                  <PaintbrushIcon className="w-3.5 h-3.5" />
+                  Create Your Template
+                </button>
+              </div>
+            )}
+
             {/* Token highlights for active body */}
             {Object.keys(activeTab === 'html' ? htmlUsage : textUsage).length > 0 && (
               <div className="flex flex-wrap gap-1">
@@ -391,6 +409,18 @@ export function StepTemplateComposer({
           </div>
         </div>
       </div>
+
+      {/* Visual template builder overlay */}
+      {builderOpen && (
+        <TemplateBuilder
+          onApply={(html) => {
+            setHtmlBody(html);
+            setActiveTab('html');
+            setBuilderOpen(false);
+          }}
+          onClose={() => setBuilderOpen(false)}
+        />
+      )}
     </div>
   );
 }
