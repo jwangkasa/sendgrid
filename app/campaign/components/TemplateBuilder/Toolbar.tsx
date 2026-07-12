@@ -185,9 +185,9 @@ export function Toolbar({
   return (
     <Tooltip.Provider>
       <header style={{
-        height: 50, borderBottom: '1px solid #e5e7eb', background: '#fff',
-        display: 'flex', alignItems: 'center', padding: '0 12px',
-        gap: 4, flexShrink: 0, overflowX: 'auto',
+        borderBottom: '1px solid #e5e7eb', background: '#fff',
+        display: 'flex', alignItems: 'center', flexWrap: 'wrap',
+        padding: '6px 12px', gap: 4, flexShrink: 0, minHeight: 46,
       }}>
 
         {/* Canvas width preset */}

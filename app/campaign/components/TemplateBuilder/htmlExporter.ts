@@ -68,12 +68,17 @@ function renderTable(el: TableElement): string {
     'font-family:Arial,Helvetica,sans-serif',
     `font-size:${el.fontSize}px`,
   ].join(';');
-  const cellStyle = `border:${el.borderWidth}px solid ${el.borderColor};padding:6px 10px;`;
+  const pad = el.cellPadding ?? 6;
+  const baseCellStyle = `border:${el.borderWidth}px solid ${el.borderColor};padding:${pad}px ${pad + 2}px;`;
   let rows = '';
   for (let r = 0; r < el.rows; r++) {
+    const isHeader = r === 0 && !!el.headerBgColor;
     let cells = '';
     for (let c = 0; c < el.cols; c++) {
       const content = el.cells[r]?.[c] ?? '';
+      const cellStyle = isHeader
+        ? `${baseCellStyle}background-color:${el.headerBgColor};font-weight:bold;`
+        : baseCellStyle;
       cells += `<td style="${cellStyle}">${escapeHtml(content)}</td>`;
     }
     rows += `<tr>${cells}</tr>`;

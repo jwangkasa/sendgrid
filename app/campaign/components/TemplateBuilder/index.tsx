@@ -301,56 +301,14 @@ export function TemplateBuilder({ onApply, onClose, idToken, columnHeaders }: Te
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', flexDirection: 'column', background: '#f1f5f9', fontFamily: 'Inter, Arial, sans-serif' }}>
-      {/* AI Content Generation Bar */}
-      <div style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e3a5f 100%)', padding: '10px 16px', borderBottom: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, maxWidth: 900, margin: '0 auto' }}>
-          <div style={{ flex: 1, position: 'relative' }}>
-            <input
-              type="text"
-              value={aiPrompt}
-              onChange={(e) => { setAiPrompt(e.currentTarget.value); setAiError(null); }}
-              onKeyDown={(e) => { if (e.key === 'Enter') { void handleAiGenerate(); } }}
-              placeholder="Describe content to generate (e.g. SAP TechEd event invitation, Q3 product update)"
-              style={{
-                width: '100%', boxSizing: 'border-box',
-                padding: '8px 14px', borderRadius: 8,
-                border: '1px solid rgba(255,255,255,0.2)',
-                background: 'rgba(255,255,255,0.1)',
-                color: '#ffffff', fontSize: 13,
-                outline: 'none', backdropFilter: 'blur(4px)',
-              }}
-            />
-          </div>
-          <button
-            onClick={() => { void handleAiGenerate(); }}
-            disabled={aiLoading || !aiPrompt.trim()}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '8px 16px', borderRadius: 8, border: 'none', cursor: aiLoading || !aiPrompt.trim() ? 'not-allowed' : 'pointer',
-              background: aiLoading || !aiPrompt.trim() ? 'rgba(255,255,255,0.15)' : 'linear-gradient(135deg, #818cf8, #6366f1)',
-              color: '#ffffff', fontSize: 13, fontWeight: 600, flexShrink: 0,
-              opacity: aiLoading || !aiPrompt.trim() ? 0.6 : 1,
-              transition: 'opacity 0.15s, background 0.15s',
-            }}
-          >
-            {aiLoading ? (
-              <span style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', display: 'inline-block', animation: 'spin 0.7s linear infinite' }} />
-            ) : (
-              <span style={{ fontSize: 15 }}>✦</span>
-            )}
-            {aiLoading ? 'Generating…' : 'Write with AI'}
-          </button>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', maxWidth: 900, margin: '4px auto 0', paddingLeft: 2 }}>
-          <span style={{ fontSize: 11, color: 'rgba(199,210,254,0.7)' }}>
-            Paste from Word — formatting carries over automatically
-          </span>
-          {aiError && (
-            <span style={{ fontSize: 11, color: '#fca5a5' }}>{aiError}</span>
-          )}
-        </div>
-      </div>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .tb-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+        @media (max-width: 700px) { .tb-header { flex-direction: column; align-items: flex-start; } }
+        .ai-bar-inner { display: flex; align-items: center; gap: 10px; }
+        @media (max-width: 600px) { .ai-bar-inner { flex-direction: column; align-items: stretch; } }
+      `}</style>
+
       <Toolbar
         state={state}
         selectedElement={selectedElement}
@@ -377,6 +335,53 @@ export function TemplateBuilder({ onApply, onClose, idToken, columnHeaders }: Te
         onClose={onClose}
         onApply={handleApply}
       />
+
+      {/* AI Content Generation Bar — below toolbar */}
+      <div style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 60%, #1e3a5f 100%)', padding: '8px 16px', borderBottom: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
+        <div className="ai-bar-inner">
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <input
+              type="text"
+              value={aiPrompt}
+              onChange={(e) => { setAiPrompt(e.currentTarget.value); setAiError(null); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') { void handleAiGenerate(); } }}
+              placeholder="Describe content to generate (e.g. Newsletter, Welcome onboarding, SAP TechEd event invitation)"
+              style={{
+                width: '100%', boxSizing: 'border-box',
+                padding: '7px 13px', borderRadius: 7,
+                border: '1px solid rgba(255,255,255,0.2)',
+                background: 'rgba(255,255,255,0.1)',
+                color: '#ffffff', fontSize: 12,
+                outline: 'none',
+              }}
+            />
+          </div>
+          <button
+            onClick={() => { void handleAiGenerate(); }}
+            disabled={aiLoading || !aiPrompt.trim()}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap',
+              padding: '7px 14px', borderRadius: 7, border: 'none', cursor: aiLoading || !aiPrompt.trim() ? 'not-allowed' : 'pointer',
+              background: aiLoading || !aiPrompt.trim() ? 'rgba(255,255,255,0.15)' : 'linear-gradient(135deg, #818cf8, #6366f1)',
+              color: '#ffffff', fontSize: 12, fontWeight: 600, flexShrink: 0,
+              opacity: aiLoading || !aiPrompt.trim() ? 0.6 : 1,
+              transition: 'opacity 0.15s',
+            }}
+          >
+            {aiLoading ? (
+              <span style={{ width: 13, height: 13, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', display: 'inline-block', animation: 'spin 0.7s linear infinite' }} />
+            ) : (
+              <span style={{ fontSize: 14 }}>✦</span>
+            )}
+            {aiLoading ? 'Generating…' : 'Write with AI'}
+          </button>
+        </div>
+        {(aiError) && (
+          <div style={{ marginTop: 3, paddingLeft: 2 }}>
+            {aiError && <span style={{ fontSize: 10, color: '#fca5a5' }}>{aiError}</span>}
+          </div>
+        )}
+      </div>
 
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         {!isPreview && (

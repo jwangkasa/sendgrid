@@ -52,6 +52,8 @@ export interface TableElement extends BaseElement {
   borderColor: string;
   borderWidth: number;
   fontSize: number;
+  cellPadding?: number;
+  headerBgColor?: string;
 }
 
 export interface SpacerElement extends BaseElement {
