@@ -21,6 +21,7 @@ interface TemplateBuilderProps {
   onApply: (html: string) => void;
   onClose: () => void;
   idToken?: string | null;
+  columnHeaders?: string[];
 }
 
 function nextY(elements: CanvasElement[]): number {
@@ -30,7 +31,7 @@ function nextY(elements: CanvasElement[]): number {
 
 interface GenerateResponse { sections: { type: string; content: string; href?: string }[] }
 
-export function TemplateBuilder({ onApply, onClose, idToken }: TemplateBuilderProps) {
+export function TemplateBuilder({ onApply, onClose, idToken, columnHeaders }: TemplateBuilderProps) {
   const historyRef = useRef<TemplateState[]>([INITIAL_STATE]);
   const indexRef = useRef(0);
   const [tick, setTick] = useState(0);
@@ -134,6 +135,18 @@ export function TemplateBuilder({ onApply, onClose, idToken }: TemplateBuilderPr
       if (!el || el.type !== 'text') return selId;
       const t = el as TextElement;
       push({ ...c, elements: c.elements.map((e) => e.id === selId ? { ...t, content: t.content + sym } : e) });
+      return selId;
+    });
+  }, [push, cur]);
+
+  const handleInsertToken = useCallback((token: string) => {
+    setSelectedId((selId) => {
+      if (!selId) return selId;
+      const c = cur();
+      const el = c.elements.find((e) => e.id === selId);
+      if (!el || el.type !== 'text') return selId;
+      const t = el as TextElement;
+      push({ ...c, elements: c.elements.map((e) => e.id === selId ? { ...t, content: t.content + token } : e) });
       return selId;
     });
   }, [push, cur]);
@@ -370,11 +383,13 @@ export function TemplateBuilder({ onApply, onClose, idToken }: TemplateBuilderPr
           <ElementsPanel
             onInsertEmoji={handleInsertEmoji}
             onInsertSymbol={handleInsertSymbol}
+            onInsertToken={handleInsertToken}
             showEmojiPicker={showEmoji}
             showSymbolPicker={showSymbol}
             onToggleEmoji={() => setShowEmoji((v) => !v)}
             onToggleSymbol={() => setShowSymbol((v) => !v)}
             onUploadImage={handleUploadImage}
+            columnHeaders={columnHeaders ?? []}
           />
         )}
 

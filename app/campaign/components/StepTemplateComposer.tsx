@@ -93,6 +93,7 @@ function TokenChip({ token, onClick, usedIn }: TokenChipProps) {
 interface StepTemplateComposerProps {
   initialTemplate: EmailTemplate;
   recipientCount: number;
+  columnHeaders?: string[];
   idToken: string | null;
   onComplete: (template: EmailTemplate) => void;
   onBack: () => void;
@@ -101,6 +102,7 @@ interface StepTemplateComposerProps {
 export function StepTemplateComposer({
   initialTemplate,
   recipientCount,
+  columnHeaders,
   idToken,
   onComplete,
   onBack,
@@ -420,6 +422,7 @@ export function StepTemplateComposer({
           }}
           onClose={() => setBuilderOpen(false)}
           idToken={idToken}
+          columnHeaders={columnHeaders}
         />
       )}
     </div>

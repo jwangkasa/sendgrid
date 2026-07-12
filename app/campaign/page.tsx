@@ -237,6 +237,7 @@ export default function CampaignPage() {
             <StepTemplateComposer
               initialTemplate={template}
               recipientCount={count}
+              columnHeaders={recipients.length > 0 ? Object.keys(recipients[0]!) : []}
               idToken={idToken}
               onComplete={handleTemplateComplete}
               onBack={() => setCurrentStep('ingestion')}
