@@ -3,9 +3,10 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { firebaseAuth as auth } from "@/lib/firebase-client";
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
 import { PlusIcon, GitBranchIcon, PlayCircleIcon, PauseCircleIcon, FileEditIcon } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
+import { AppNav } from '@/app/components/AppNav';
 
 interface SequenceSummary {
   ID: string; NAME: string; STATUS: string; CREATED_AT: string; UPDATED_AT: string;
@@ -20,6 +21,7 @@ const STATUS_COLOR: Record<string, { bg: string; color: string }> = {
 export default function SequencesPage() {
   const router = useRouter();
   const [idToken, setIdToken] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [sequences, setSequences] = useState<SequenceSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -29,6 +31,7 @@ export default function SequencesPage() {
       if (!user) { router.push('/login'); return; }
       const token = await user.getIdToken();
       setIdToken(token);
+      setUserEmail(user.email ?? null);
     });
     return unsub;
   }, [router]);
@@ -46,7 +49,6 @@ export default function SequencesPage() {
     setCreating(true);
     try {
       const id = uuidv4();
-      // Create in DB then navigate — use a placeholder name
       const res = await fetch('/api/sequences', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
@@ -59,25 +61,39 @@ export default function SequencesPage() {
     }
   }
 
+  async function handleSignOut() {
+    await firebaseSignOut(auth);
+    router.push('/login');
+  }
+
   return (
-    <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: 'Inter,Arial,sans-serif' }}>
-      {/* Header */}
-      <div style={{ background: 'linear-gradient(135deg,#0f52ba,#1a6fd4)', padding: '18px 32px', borderBottom: '1px solid rgba(255,255,255,0.15)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: '#fff' }}>Email Sequences</h1>
-            <p style={{ margin: '4px 0 0', fontSize: 12, color: 'rgba(214,234,255,0.85)' }}>
-              Automate follow-up emails based on engagement — drag, drop, and connect nodes to build your flow
-            </p>
-          </div>
-          <button onClick={() => void handleCreate()} disabled={creating} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px', borderRadius: 8, border: 'none', background: '#fff', color: '#0f52ba', fontSize: 13, fontWeight: 700, cursor: creating ? 'not-allowed' : 'pointer' }}>
-            <PlusIcon style={{ width: 15, height: 15 }} />
+    <div className="min-h-screen bg-gray-50 flex flex-col" style={{ fontFamily: 'Inter,Arial,sans-serif' }}>
+      <AppNav
+        active="sequences"
+        userEmail={userEmail}
+        onSignOut={() => void handleSignOut()}
+        rightSlot={
+          <button
+            onClick={() => void handleCreate()}
+            disabled={creating}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-500 text-white text-xs font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            <PlusIcon className="w-3 h-3" />
             {creating ? 'Creating…' : 'New Sequence'}
           </button>
-        </div>
+        }
+      />
+
+      {/* Page heading */}
+      <div className="max-w-[1400px] mx-auto w-full px-6 pt-8 pb-2">
+        <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+          <GitBranchIcon className="w-5 h-5 text-brand-600" />
+          Email Sequences
+        </h1>
+        <p className="text-sm text-gray-500 mt-1">Automate follow-up emails — drag, drop, and connect nodes to build your flow</p>
       </div>
 
-      <div style={{ padding: '32px', maxWidth: 960, margin: '0 auto' }}>
+      <div className="max-w-[1400px] mx-auto w-full px-6 py-6">
         {loading ? (
           <div style={{ color: '#94a3b8', textAlign: 'center', paddingTop: 60 }}>Loading…</div>
         ) : sequences.length === 0 ? (

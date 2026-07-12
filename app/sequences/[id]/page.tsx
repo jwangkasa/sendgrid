@@ -3,10 +3,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { firebaseAuth as auth } from "@/lib/firebase-client";
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
 import { FlowCanvas } from './components/FlowCanvas';
 import { ChevronLeftIcon, SaveIcon, PlayIcon, UsersIcon, CheckIcon } from 'lucide-react';
 import type { SequenceFlow, RecipientRow } from '@/lib/types';
+import { AppNav } from '@/app/components/AppNav';
 
 const DEFAULT_FLOW: SequenceFlow = {
   nodes: [{ id: 'n-start', type: 'start', position: { x: 250, y: 50 }, data: { label: 'Campaign Start' } }],
@@ -17,6 +18,7 @@ export default function SequenceEditorPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [idToken, setIdToken] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [name, setName] = useState('Untitled Sequence');
   const [flow, setFlow] = useState<SequenceFlow>(DEFAULT_FLOW);
   const [loading, setLoading] = useState(true);
@@ -32,6 +34,7 @@ export default function SequenceEditorPage() {
       if (!user) { router.push('/login'); return; }
       const token = await user.getIdToken();
       setIdToken(token);
+      setUserEmail(user.email ?? null);
     });
     return unsub;
   }, [router]);
@@ -81,30 +84,42 @@ export default function SequenceEditorPage() {
     }
   }, [idToken, id, running]);
 
+  async function handleSignOut() {
+    await firebaseSignOut(auth);
+    router.push('/login');
+  }
+
   if (loading) {
     return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', fontFamily: 'Inter,Arial,sans-serif', color: '#6b7280' }}>Loading…</div>;
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', fontFamily: 'Inter,Arial,sans-serif', background: '#f8fafc' }}>
-      {/* Header */}
-      <div style={{ background: 'linear-gradient(135deg,#0f52ba,#1a6fd4)', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,0.15)' }}>
-        <button onClick={() => router.push('/sequences')} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: 6, padding: '5px 8px', cursor: 'pointer', color: '#fff', display: 'flex', alignItems: 'center', gap: 4 }}>
+      {/* Global nav */}
+      <AppNav
+        active="sequences"
+        userEmail={userEmail}
+        onSignOut={() => void handleSignOut()}
+      />
+
+      {/* Sequence toolbar */}
+      <div style={{ background: '#fff', borderBottom: '1px solid #e2e8f0', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+        <button onClick={() => router.push('/sequences')} style={{ background: '#f1f5f9', border: 'none', borderRadius: 6, padding: '5px 10px', cursor: 'pointer', color: '#374151', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 500 }}>
           <ChevronLeftIcon style={{ width: 14, height: 14 }} />
-          <span style={{ fontSize: 12 }}>Back</span>
+          Back
         </button>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          style={{ flex: 1, background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 6, padding: '5px 10px', color: '#fff', fontSize: 14, fontWeight: 600, outline: 'none', fontFamily: 'inherit' }}
+          style={{ flex: 1, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, padding: '5px 10px', color: '#111827', fontSize: 14, fontWeight: 600, outline: 'none', fontFamily: 'inherit' }}
         />
-        <button onClick={() => setShowEnroll(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.15)', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+        <button onClick={() => setShowEnroll(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 6, border: '1px solid #d1d5db', background: '#f9fafb', color: '#374151', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
           <UsersIcon style={{ width: 13, height: 13 }} /> Enroll Recipients
         </button>
-        <button onClick={() => void handleRun()} disabled={running} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 6, border: 'none', background: running ? 'rgba(255,255,255,0.2)' : '#10b981', color: '#fff', fontSize: 12, fontWeight: 600, cursor: running ? 'not-allowed' : 'pointer' }}>
+        <button onClick={() => void handleRun()} disabled={running} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 6, border: 'none', background: running ? '#d1fae5' : '#10b981', color: '#fff', fontSize: 12, fontWeight: 600, cursor: running ? 'not-allowed' : 'pointer' }}>
           <PlayIcon style={{ width: 13, height: 13 }} /> {running ? 'Running…' : 'Run Now'}
         </button>
-        <button onClick={() => void handleSave()} disabled={saving} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 6, border: 'none', background: saveDone ? '#10b981' : '#fff', color: saveDone ? '#fff' : '#0f52ba', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+        <button onClick={() => void handleSave()} disabled={saving} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 6, border: 'none', background: saveDone ? '#10b981' : '#0f52ba', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
           {saveDone ? <CheckIcon style={{ width: 13, height: 13 }} /> : <SaveIcon style={{ width: 13, height: 13 }} />}
           {saving ? 'Saving…' : saveDone ? 'Saved!' : 'Save'}
         </button>

@@ -10,8 +10,8 @@ import { StepTemplateComposer } from './components/StepTemplateComposer';
 import { StepPreview } from './components/StepPreview';
 import { useRecipients } from './hooks/useRecipients';
 import { TemplateBuilder } from './components/TemplateBuilder';
-import { LogOutIcon, PaintbrushIcon, CheckIcon, BuildingIcon, MailPlusIcon, LayoutDashboardIcon, GitBranchIcon } from 'lucide-react';
-import { Logo } from '@/app/components/Logo';
+import { LogOutIcon, PaintbrushIcon, CheckIcon } from 'lucide-react';
+import { AppNav } from '@/app/components/AppNav';
 
 export default function CampaignPage() {
   const { user, loading, signOut, idToken } = useAuth();
@@ -142,65 +142,12 @@ export default function CampaignPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Top bar */}
-      <header className="border-b border-gray-200 bg-white/90 backdrop-blur-sm sticky top-0 z-20 shadow-sm">
-        <div className="max-w-5xl mx-auto px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-              <Logo size="sm" />
-              <span className="text-sm font-semibold text-gray-900">Bulk Email Engine</span>
-            </div>
-
-          {/* Nav tabs */}
-          <nav className="hidden sm:flex items-center gap-0.5">
-            <button
-              onClick={() => router.push('/vendors')}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 text-xs font-medium transition-colors"
-            >
-              <BuildingIcon className="w-3.5 h-3.5" />
-              Vendor Campaign
-            </button>
-            <span className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-brand-50 border border-brand-200 text-brand-700 text-xs font-semibold">
-              <MailPlusIcon className="w-3.5 h-3.5" />
-              New Campaign
-            </span>
-            <button
-              onClick={() => router.push('/dashboard')}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 text-xs font-medium transition-colors"
-            >
-              <LayoutDashboardIcon className="w-3.5 h-3.5" />
-              Dashboard
-            </button>
-            <button
-              onClick={() => setBuilderOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 text-xs font-medium transition-colors"
-            >
-              <PaintbrushIcon className="w-3.5 h-3.5" />
-              Template Builder
-            </button>
-            <button
-              onClick={() => router.push('/sequences')}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 text-xs font-medium transition-colors"
-            >
-              <GitBranchIcon className="w-3.5 h-3.5" />
-              Sequences
-            </button>
-          </nav>
-
-          <div className="flex items-center gap-4">
-            {user && (
-              <span className="text-xs text-gray-500 hidden sm:block">
-                {user.email}
-              </span>
-            )}
-            <button
-              onClick={signOut}
-              className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-900 transition-colors"
-            >
-              <LogOutIcon className="w-3.5 h-3.5" />
-              Sign out
-            </button>
-          </div>
-        </div>
-      </header>
+      <AppNav
+        active="campaign"
+        userEmail={user?.email}
+        onSignOut={signOut}
+        onTemplateBuilder={() => setBuilderOpen(true)}
+      />
 
       {/* Main content */}
       <main className="flex-1 max-w-5xl mx-auto w-full px-6 py-10 flex flex-col gap-10">
