@@ -7,6 +7,7 @@ interface BaseElement {
   y: number;
   width: number;
   height: number;
+  locked?: boolean;
 }
 
 export interface TextElement extends BaseElement {
@@ -65,9 +66,24 @@ export type CanvasElement =
   | TableElement
   | SpacerElement;
 
+export type ScriptType = 'ga4' | 'gtm' | 'fb_pixel' | 'custom';
+
+export interface TrackingScript {
+  id: string;
+  name: string;
+  type: ScriptType;
+  value: string;
+  enabled: boolean;
+}
+
 export interface TemplateState {
   elements: CanvasElement[];
   canvasBackground: string;
+  canvasWidth: number;
+  showGrid: boolean;
+  gridSize: number;
+  trackingScripts: TrackingScript[];
+  backgroundImage: string;
 }
 
 export type ResizeHandle = 'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'e' | 'w';
