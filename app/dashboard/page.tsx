@@ -10,7 +10,7 @@ import { KPICards } from './components/KPICards';
 import { RecipientTable } from './components/RecipientTable';
 import { AiFollowUpPanel } from './components/AiFollowUpPanel';
 import type { BatchSummary } from '@/app/api/campaign/batches/route';
-import type { RecipientLog } from '@/lib/types';
+import type { RecipientLog, RecipientRow } from '@/lib/types';
 import {
   PlusIcon,
   RefreshCwIcon,
@@ -208,6 +208,7 @@ function DashboardContent() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
     initialBatch ? new Set([initialBatch]) : new Set()
   );
+  const [selectedRecipients, setSelectedRecipients] = useState<RecipientLog[]>([]);
 
   useEffect(() => {
     if (!startTimeRef.current) {
@@ -300,6 +301,21 @@ function DashboardContent() {
     const fileName = `recipients_${selectedNames || 'export'}_${new Date().toISOString().slice(0, 10)}.xlsx`;
     xlsxWriteFile(wb, fileName);
   }, [data, batches, selectedIds]);
+
+  const handleConvertToCampaign = useCallback(() => {
+    if (selectedRecipients.length === 0) return;
+    const recipients: RecipientRow[] = selectedRecipients.map((r) => ({
+      EMAIL_ADDRESS: r.EMAIL_ADDRESS,
+      FIRST_NAME:    r.FIRST_NAME    ?? '',
+      LAST_NAME:     r.LAST_NAME     ?? '',
+      CATEGORY:      r.CATEGORY      ?? '',
+      COMPANY:       r.COMPANY       ?? '',
+      PHONE_NUMBER:  r.PHONE_NUMBER  ?? '',
+      COMMENTS:      r.COMMENTS      ?? '',
+    }));
+    sessionStorage.setItem('dashboard_prefill', JSON.stringify({ recipients }));
+    router.push('/campaign');
+  }, [selectedRecipients, router]);
 
   if (authLoading) {
     return (
@@ -486,6 +502,20 @@ function DashboardContent() {
                   {data && <span className="text-xs text-gray-400">{data.rows.length.toLocaleString()} rows</span>}
                   {data?.rows.length ? (
                     <button
+                      onClick={handleConvertToCampaign}
+                      disabled={selectedRecipients.length === 0}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-colors shadow-sm text-xs font-medium
+                                 disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed
+                                 enabled:border-brand-300 enabled:bg-brand-600 enabled:text-white enabled:hover:bg-brand-500"
+                    >
+                      <PlusIcon className="w-3.5 h-3.5" />
+                      {selectedRecipients.length > 0
+                        ? `Convert to Campaign (${selectedRecipients.length.toLocaleString()})`
+                        : 'Convert to Campaign'}
+                    </button>
+                  ) : null}
+                  {data?.rows.length ? (
+                    <button
                       onClick={exportToExcel}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-300
                                  bg-white text-xs text-gray-700 font-medium hover:bg-gray-50
@@ -497,7 +527,7 @@ function DashboardContent() {
                   ) : null}
                 </div>
               </div>
-              {isLoading && !data ? <SkeletonTable /> : data ? <RecipientTable rows={data.rows} /> : null}
+              {isLoading && !data ? <SkeletonTable /> : data ? <RecipientTable rows={data.rows} onSelectionChange={setSelectedRecipients} /> : null}
             </div>
           </>
         )}

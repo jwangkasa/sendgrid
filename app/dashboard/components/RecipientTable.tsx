@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   useReactTable,
   getCoreRowModel,
@@ -11,6 +11,7 @@ import {
   flexRender,
   type SortingState,
   type ColumnFiltersState,
+  type RowSelectionState,
 } from '@tanstack/react-table';
 import type { RecipientLog, DeliveryStatus } from '@/lib/types';
 import {
@@ -66,7 +67,50 @@ function SortIcon({ direction }: { direction: 'asc' | 'desc' | false }) {
 
 const columnHelper = createColumnHelper<RecipientLog>();
 
+function IndeterminateCheckbox({
+  checked,
+  indeterminate,
+  onChange,
+}: {
+  checked: boolean;
+  indeterminate?: boolean;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = indeterminate ?? false;
+  }, [indeterminate]);
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      checked={checked}
+      onChange={onChange}
+      className="w-3.5 h-3.5 accent-brand-600 cursor-pointer"
+    />
+  );
+}
+
 const columns = [
+  columnHelper.display({
+    id: 'select',
+    header: ({ table }) => (
+      <IndeterminateCheckbox
+        checked={table.getIsAllPageRowsSelected()}
+        indeterminate={table.getIsSomePageRowsSelected()}
+        onChange={table.getToggleAllPageRowsSelectedHandler()}
+      />
+    ),
+    cell: ({ row }) => (
+      <IndeterminateCheckbox
+        checked={row.getIsSelected()}
+        onChange={row.getToggleSelectedHandler()}
+      />
+    ),
+    size: 36,
+    enableSorting: false,
+  }),
+
   columnHelper.display({
     id: 'rowNum',
     header: '#',
@@ -183,13 +227,15 @@ const columns = [
 
 interface RecipientTableProps {
   rows: RecipientLog[];
+  onSelectionChange?: (selected: RecipientLog[]) => void;
 }
 
-export function RecipientTable({ rows }: RecipientTableProps) {
+export function RecipientTable({ rows, onSelectionChange }: RecipientTableProps) {
   const [sorting,        setSorting]       = useState<SortingState>([{ id: 'UPDATED_AT', desc: true }]);
   const [columnFilters,  setColumnFilters] = useState<ColumnFiltersState>([]);
   const [globalFilter,   setGlobalFilter]  = useState('');
   const [statusFilter,   setStatusFilter]  = useState<string>('all');
+  const [rowSelection,   setRowSelection]  = useState<RowSelectionState>({});
 
   // Merge the status dropdown into columnFilters
   const effectiveFilters: ColumnFiltersState = useMemo(() => {
@@ -208,7 +254,10 @@ export function RecipientTable({ rows }: RecipientTableProps) {
       columnFilters: effectiveFilters,
       globalFilter,
       pagination: { pageIndex: 0, pageSize: 50 },
+      rowSelection,
     },
+    enableRowSelection: true,
+    onRowSelectionChange: setRowSelection,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onGlobalFilterChange: setGlobalFilter,
@@ -219,6 +268,13 @@ export function RecipientTable({ rows }: RecipientTableProps) {
     globalFilterFn: 'includesString',
     autoResetPageIndex: false,
   });
+
+  // Notify parent whenever selection changes
+  useEffect(() => {
+    if (!onSelectionChange) return;
+    onSelectionChange(table.getSelectedRowModel().rows.map((r) => r.original));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rowSelection]);
 
   const { pageIndex, pageSize } = table.getState().pagination;
   const totalFiltered = table.getFilteredRowModel().rows.length;

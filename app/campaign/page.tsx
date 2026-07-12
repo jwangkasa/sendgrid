@@ -131,6 +131,24 @@ export default function CampaignPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Pre-populate from Dashboard "Convert to Campaign" via sessionStorage
+  useEffect(() => {
+    const raw = sessionStorage.getItem('dashboard_prefill');
+    if (!raw) return;
+    sessionStorage.removeItem('dashboard_prefill');
+    try {
+      const { recipients: rows } = JSON.parse(raw) as { recipients: RecipientRow[] };
+      if (Array.isArray(rows) && rows.length > 0) {
+        setRecipients(rows, 'Dashboard Selection');
+        setCompletedSteps(new Set<WizardStep>(['ingestion']));
+        setCurrentStep('compose');
+      }
+    } catch {
+      // malformed sessionStorage value — ignore
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   if (loading || (!loading && !user)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
