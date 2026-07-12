@@ -10,7 +10,7 @@ import {
   PlusIcon, TrashIcon,
 } from 'lucide-react';
 import type { CanvasElement, TextElement, TableElement, TemplateState, TrackingScript, ScriptType } from './types';
-import { exportHtml } from './htmlExporter';
+import { exportBodyHtml } from './htmlExporter';
 import { parseAndConvertJson } from './importConverter';
 
 const WIDTH_PRESETS = [
@@ -133,7 +133,7 @@ export function Toolbar({
   const isCustomWidth = !currentPreset || currentPreset.value === 0;
 
   async function handleCopyHtml() {
-    await navigator.clipboard.writeText(exportHtml(state));
+    await navigator.clipboard.writeText(exportBodyHtml(state));
     setCopyDone(true);
     setTimeout(() => setCopyDone(false), 2000);
   }
