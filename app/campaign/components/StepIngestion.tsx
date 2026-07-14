@@ -37,6 +37,13 @@ function normaliseHeader(raw: string): string {
   return raw.trim().toUpperCase().replace(/\s+/g, '_');
 }
 
+// Strip invisible Unicode control/formatting characters (e.g. U+202C, U+200B, U+FEFF, etc.)
+// that are invisible in spreadsheet cells but break email validation downstream.
+function sanitiseValue(s: string): string {
+  // \p{Cf} = Unicode "Format" category (includes directional marks, zero-width chars, BOM, etc.)
+  return s.replace(/\p{Cf}/gu, '').trim();
+}
+
 function parseSheet(buffer: ArrayBuffer, fileName: string): ParseResult {
   const workbook  = xlsxRead(buffer, { type: 'array', cellText: true, cellDates: false });
   const sheetName = workbook.SheetNames[0];
@@ -54,7 +61,7 @@ function parseSheet(buffer: ArrayBuffer, fileName: string): ParseResult {
   const normalised: Record<string, string>[] = rawRows.map((row) => {
     const out: Record<string, string> = {};
     for (const [k, v] of Object.entries(row)) {
-      out[normaliseHeader(k)] = String(v ?? '').trim();
+      out[normaliseHeader(k)] = sanitiseValue(String(v ?? ''));
     }
     return out;
   });
