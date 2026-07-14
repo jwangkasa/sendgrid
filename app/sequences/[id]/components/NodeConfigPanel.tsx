@@ -16,9 +16,10 @@ interface Props {
   onUpdate: (id: string, data: Partial<SequenceNode['data']>) => void;
   onDelete: (id: string) => void;
   onClose: () => void;
+  onSwapBranches?: (id: string) => void;
 }
 
-export function NodeConfigPanel({ node, idToken, onUpdate, onDelete, onClose }: Props) {
+export function NodeConfigPanel({ node, idToken, onUpdate, onDelete, onClose, onSwapBranches }: Props) {
   const [aiPrompt, setAiPrompt] = useState(node.data.aiPrompt ?? '');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
@@ -186,6 +187,14 @@ export function NodeConfigPanel({ node, idToken, onUpdate, onDelete, onClose }: 
               <div style={{ marginTop: 8, padding: 8, background: '#f0fdf4', borderRadius: 6, fontSize: 10, color: '#166534' }}>
                 ✓ YES → matched status&nbsp;&nbsp;&nbsp;✗ NO → did not match
               </div>
+              {onSwapBranches && (
+                <button
+                  onClick={() => onSwapBranches(node.id)}
+                  style={{ marginTop: 8, width: '100%', padding: '7px 0', borderRadius: 6, border: '1px solid #d1d5db', background: '#f9fafb', color: '#374151', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+                >
+                  ⇄ Swap YES / NO branches
+                </button>
+              )}
             </div>
           )}
 

@@ -111,6 +111,22 @@ export function FlowCanvas({ initialFlow, idToken, onChange }: Props) {
     setSelectedNode(null);
   }, [setNodes, setEdges, emitChange]);
 
+  const handleSwapBranches = useCallback((id: string) => {
+    setEdges((eds) => {
+      const next = eds.map((e) => {
+        if (e.source !== id) return e;
+        const newLabel = e.label === 'yes' ? 'no' : e.label === 'no' ? 'yes' : e.label;
+        return {
+          ...e,
+          label: newLabel,
+          style: newLabel === 'no' ? { stroke: '#dc2626' } : newLabel === 'yes' ? { stroke: '#16a34a' } : e.style,
+        };
+      });
+      emitChange(nodes, next);
+      return next;
+    });
+  }, [setEdges, emitChange, nodes]);
+
   return (
     <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
       <NodePalette />
@@ -157,6 +173,7 @@ export function FlowCanvas({ initialFlow, idToken, onChange }: Props) {
           onUpdate={handleUpdateNodeData}
           onDelete={handleDeleteNode}
           onClose={() => setSelectedNode(null)}
+          onSwapBranches={handleSwapBranches}
         />
       )}
     </div>

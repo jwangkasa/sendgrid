@@ -189,6 +189,7 @@ function StepHeader({ current }: { current: number }) {
 function EnrollModal({ sequenceId, idToken, onClose }: { sequenceId: string; idToken: string; onClose: () => void }) {
   const [step, setStep] = useState(1);
   const [recipients, setRecipients] = useState<RecipientRow[]>([]);
+  const recipientsRef = useRef<RecipientRow[]>([]);
   const [fileName, setFileName] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
@@ -226,6 +227,7 @@ function EnrollModal({ sequenceId, idToken, onClose }: { sequenceId: string; idT
           };
         }).filter((r) => r.EMAIL_ADDRESS.trim());
         if (normalised.length === 0) { setParseError('No rows with EMAIL_ADDRESS found.'); return; }
+        recipientsRef.current = normalised;
         setRecipients(normalised);
         setStep(2);
       } catch {
@@ -255,7 +257,7 @@ function EnrollModal({ sequenceId, idToken, onClose }: { sequenceId: string; idT
       const res = await fetch(`/api/sequences/${sequenceId}/enroll`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-        body: JSON.stringify({ recipients }),
+        body: JSON.stringify({ recipients: recipientsRef.current }),
       });
       const data = await res.json() as { enrolled: number };
       setResult(data);
