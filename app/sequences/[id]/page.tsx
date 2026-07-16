@@ -6,7 +6,7 @@ import { firebaseAuth as auth } from "@/lib/firebase-client";
 import { onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
 import { FlowCanvas } from './components/FlowCanvas';
 import { ChevronLeftIcon, SaveIcon, PlayIcon, UsersIcon, CheckIcon, UploadCloudIcon } from 'lucide-react';
-import type { SequenceFlow, RecipientRow } from '@/lib/types';
+import type { SequenceFlow, RecipientRow, SequenceAuditLog } from '@/lib/types';
 import { AppNav } from '@/app/components/AppNav';
 import * as XLSX from 'xlsx';
 
@@ -28,6 +28,9 @@ export default function SequenceEditorPage() {
   const [running, setRunning] = useState(false);
   const [runResult, setRunResult] = useState<{ processed: number; emailsSent: number; completed: number; errors: number } | null>(null);
   const [showEnroll, setShowEnroll] = useState(false);
+  const [showAudit, setShowAudit] = useState(false);
+  const [auditLogs, setAuditLogs] = useState<SequenceAuditLog[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
   const flowRef = useRef<SequenceFlow>(DEFAULT_FLOW);
 
   useEffect(() => {
@@ -68,6 +71,20 @@ export default function SequenceEditorPage() {
     }
   }, [idToken, id, name, saving]);
 
+  const fetchAuditLogs = useCallback(async () => {
+    if (!idToken || !id) return;
+    setAuditLoading(true);
+    try {
+      const res = await fetch(`/api/sequences/${id}/audit`, { headers: { Authorization: `Bearer ${idToken}` } });
+      if (res.ok) {
+        const data = await res.json() as { logs: SequenceAuditLog[] };
+        setAuditLogs(data.logs);
+      }
+    } finally {
+      setAuditLoading(false);
+    }
+  }, [idToken, id]);
+
   const handleRun = useCallback(async () => {
     if (!idToken || running) return;
     setRunning(true);
@@ -80,10 +97,11 @@ export default function SequenceEditorPage() {
       });
       const data = await res.json() as { processed: number; emailsSent: number; completed: number; errors: number };
       setRunResult(data);
+      void fetchAuditLogs();
     } finally {
       setRunning(false);
     }
-  }, [idToken, id, running]);
+  }, [idToken, id, running, fetchAuditLogs]);
 
   async function handleSignOut() {
     await firebaseSignOut(auth);
@@ -132,6 +150,53 @@ export default function SequenceEditorPage() {
           <button onClick={() => setRunResult(null)} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'inherit', opacity: 0.6 }}>✕</button>
         </div>
       )}
+
+      {/* Execution History panel */}
+      <div style={{ flexShrink: 0, borderBottom: '1px solid #e2e8f0', background: '#fff' }}>
+        <button
+          onClick={() => {
+            const next = !showAudit;
+            setShowAudit(next);
+            if (next && auditLogs.length === 0) void fetchAuditLogs();
+          }}
+          style={{ width: '100%', padding: '6px 16px', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#374151', textAlign: 'left' }}
+        >
+          <span style={{ fontSize: 10, transition: 'transform 0.15s', display: 'inline-block', transform: showAudit ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+          Execution History
+          {auditLogs.length > 0 && <span style={{ marginLeft: 4, color: '#9ca3af', fontWeight: 400 }}>({auditLogs.length})</span>}
+          {auditLoading && <span style={{ marginLeft: 'auto', color: '#9ca3af', fontWeight: 400 }}>Loading…</span>}
+        </button>
+        {showAudit && (
+          <div style={{ maxHeight: 240, overflowY: 'auto', borderTop: '1px solid #f1f5f9' }}>
+            {auditLogs.length === 0 && !auditLoading ? (
+              <div style={{ padding: '16px', fontSize: 12, color: '#9ca3af', textAlign: 'center' }}>No runs yet.</div>
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <thead>
+                  <tr style={{ background: '#f8fafc', position: 'sticky', top: 0 }}>
+                    {['Ran At', 'Processed', 'Emails Sent', 'Completed', 'Errors'].map((h) => (
+                      <th key={h} style={{ padding: '6px 12px', textAlign: h === 'Ran At' ? 'left' : 'center', fontWeight: 700, color: '#6b7280', fontSize: 10, letterSpacing: '0.04em', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {auditLogs.map((log) => (
+                    <tr key={log.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '6px 12px', color: '#374151', whiteSpace: 'nowrap' }}>
+                        {new Date(log.ranAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </td>
+                      <td style={{ padding: '6px 12px', textAlign: 'center', color: '#374151' }}>{log.processed}</td>
+                      <td style={{ padding: '6px 12px', textAlign: 'center', color: '#374151' }}>{log.emailsSent}</td>
+                      <td style={{ padding: '6px 12px', textAlign: 'center', color: '#374151' }}>{log.completed}</td>
+                      <td style={{ padding: '6px 12px', textAlign: 'center', fontWeight: log.errors > 0 ? 700 : 400, color: log.errors > 0 ? '#d97706' : '#374151' }}>{log.errors}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Canvas */}
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
@@ -194,7 +259,7 @@ function EnrollModal({ sequenceId, idToken, onClose }: { sequenceId: string; idT
   const [dragOver, setDragOver] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
   const [enrolling, setEnrolling] = useState(false);
-  const [result, setResult] = useState<{ enrolled: number } | null>(null);
+  const [result, setResult] = useState<{ enrolled: number; skipped: number } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   function parseFile(file: File) {
@@ -259,7 +324,12 @@ function EnrollModal({ sequenceId, idToken, onClose }: { sequenceId: string; idT
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({ recipients: recipientsRef.current }),
       });
-      const data = await res.json() as { enrolled: number };
+      if (!res.ok) {
+        const err = await res.json() as { message?: string };
+        setParseError(err.message ?? 'Enrollment failed. Please try again.');
+        return;
+      }
+      const data = await res.json() as { enrolled: number; skipped: number };
       setResult(data);
       setStep(3);
     } finally {
@@ -389,6 +459,11 @@ function EnrollModal({ sequenceId, idToken, onClose }: { sequenceId: string; idT
             <p style={{ margin: '0 0 20px', fontSize: 14, color: '#64748b' }}>
               <strong style={{ color: '#0f52ba', fontSize: 22 }}>{result.enrolled.toLocaleString()}</strong> recipients enrolled into this sequence.
             </p>
+            {result.skipped > 0 && (
+              <p style={{ margin: '-12px 0 20px', fontSize: 12, color: '#94a3b8' }}>
+                {result.skipped.toLocaleString()} already-active recipient{result.skipped !== 1 ? 's' : ''} skipped.
+              </p>
+            )}
             <p style={{ margin: '0 0 24px', fontSize: 12, color: '#94a3b8' }}>Click <strong>Run Now</strong> in the toolbar to start processing.</p>
             <button onClick={onClose} style={{ padding: '10px 32px', borderRadius: 8, border: 'none', background: '#0f52ba', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
               Done

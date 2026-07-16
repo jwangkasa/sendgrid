@@ -162,5 +162,12 @@ export async function runSequence(
     }
   }
 
+  await query(
+    `INSERT INTO "HATCH"."SEQUENCE_AUDIT_LOGS"
+       (ID, SEQUENCE_ID, RAN_AT, PROCESSED, EMAILS_SENT, COMPLETED, ERRORS)
+     VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?)`,
+    [uuidv4(), sequenceId, result.processed, result.emailsSent, result.completed, result.errors],
+  ).catch(() => {/* non-fatal */});
+
   return result;
 }

@@ -248,3 +248,13 @@ export interface SequenceRunResult {
   completed: number;
   errors: number;
 }
+
+export interface SequenceAuditLog {
+  id: string;
+  sequenceId: string;
+  ranAt: string;
+  processed: number;
+  emailsSent: number;
+  completed: number;
+  errors: number;
+}

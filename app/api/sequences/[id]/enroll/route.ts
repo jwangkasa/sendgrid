@@ -31,6 +31,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
 
     const now = new Date().toISOString();
     let enrolled = 0;
+    let skipped = 0;
 
     for (const recipient of recipients) {
       if (!recipient.EMAIL_ADDRESS) continue;
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
         `SELECT ID FROM "HATCH"."SEQUENCE_ENROLLMENTS" WHERE SEQUENCE_ID = ? AND EMAIL_ADDRESS = ? AND STATUS = 'active'`,
         [id, recipient.EMAIL_ADDRESS],
       );
-      if (existing.rows.length > 0) continue;
+      if (existing.rows.length > 0) { skipped++; continue; }
 
       await query(
         `INSERT INTO "HATCH"."SEQUENCE_ENROLLMENTS"
@@ -49,7 +50,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       enrolled++;
     }
 
-    return NextResponse.json({ enrolled });
+    return NextResponse.json({ enrolled, skipped });
   } catch (e) {
     console.error('[POST /api/sequences/[id]/enroll]', e);
     return NextResponse.json({ message: 'Database error' }, { status: 500 });
