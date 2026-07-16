@@ -157,7 +157,7 @@ export default function SequenceEditorPage() {
           onClick={() => {
             const next = !showAudit;
             setShowAudit(next);
-            if (next && auditLogs.length === 0) void fetchAuditLogs();
+            if (next) void fetchAuditLogs();
           }}
           style={{ width: '100%', padding: '6px 16px', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#374151', textAlign: 'left' }}
         >
