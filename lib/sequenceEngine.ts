@@ -1,5 +1,5 @@
 import { query } from '@/lib/db';
-import { sendPersonalizedBatch } from '@/lib/sendgrid';
+import { sendPersonalizedBatch, fetchLiveMessageStatus } from '@/lib/sendgrid';
 import { v4 as uuidv4 } from 'uuid';
 import type {
   SequenceFlow, SequenceNode, RecipientRow, EmailTemplate, SequenceRunResult,
@@ -59,6 +59,44 @@ function nextWindowOpen(now: Date, startHour: number, endHour: number, allowedDa
 }
 
 // ─── Condition evaluator ──────────────────────────────────────────────────────
+
+// Before evaluating a condition, pull the latest status from SendGrid's
+// Messages API and write it back to RECIPIENT_LOGS so the condition query
+// sees fresh data rather than relying solely on webhook delivery timing.
+async function syncLiveStatus(email: string, batchId: string): Promise<void> {
+  try {
+    const sgRow = await query<{ SG_MESSAGE_ID: string }>(
+      `SELECT "SG_MESSAGE_ID" FROM "HATCH"."RECIPIENT_LOGS"
+        WHERE "EMAIL_ADDRESS" = ? AND "BATCH_ID" = ? AND "SG_MESSAGE_ID" IS NOT NULL`,
+      [email, batchId],
+    );
+    const sgMessageId = sgRow.rows[0]?.SG_MESSAGE_ID;
+    if (!sgMessageId) return;
+
+    const liveStatus = await fetchLiveMessageStatus(sgMessageId);
+    if (!liveStatus) return;
+
+    // Only advance status — never regress a terminal state (Bounced/Dropped)
+    const current = await query<{ DELIVERY_STATUS: string }>(
+      `SELECT "DELIVERY_STATUS" FROM "HATCH"."RECIPIENT_LOGS"
+        WHERE "EMAIL_ADDRESS" = ? AND "BATCH_ID" = ?`,
+      [email, batchId],
+    );
+    const currentStatus = current.rows[0]?.DELIVERY_STATUS;
+    if (currentStatus === 'Bounced' || currentStatus === 'Dropped') return;
+
+    await query(
+      `UPDATE "HATCH"."RECIPIENT_LOGS"
+          SET "DELIVERY_STATUS" = ?, "UPDATED_AT" = CURRENT_TIMESTAMP
+        WHERE "EMAIL_ADDRESS" = ? AND "BATCH_ID" = ?
+          AND "DELIVERY_STATUS" != ? AND "DELIVERY_STATUS" != 'Bounced' AND "DELIVERY_STATUS" != 'Dropped'`,
+      [liveStatus, email, batchId, liveStatus],
+    );
+  } catch (e) {
+    // Non-fatal — fall back to whatever is already in HANA
+    console.warn('[sequenceEngine] syncLiveStatus error:', e);
+  }
+}
 
 async function evaluateCondition(
   node: SequenceNode,
@@ -159,6 +197,8 @@ export async function advanceEnrollment(
     }
 
     if (currentNode.type === 'condition') {
+      // Pull fresh status from SendGrid before evaluating — non-fatal if unavailable
+      if (lastBatchId) await syncLiveStatus(enrollment.EMAIL_ADDRESS, lastBatchId);
       const branch = await evaluateCondition(currentNode, enrollment.EMAIL_ADDRESS, lastBatchId);
       currentNode = nextNode(flow, currentNode.id, branch) ?? undefined!;
       continue;

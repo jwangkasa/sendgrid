@@ -11,7 +11,7 @@
  * responses so the dispatch route can abort its transaction.
  */
 
-import type { RecipientRow, EmailTemplate } from '@/lib/types';
+import type { RecipientRow, EmailTemplate, DeliveryStatus } from '@/lib/types';
 
 // ─── Initialisation ───────────────────────────────────────────────────────────
 
@@ -167,4 +167,81 @@ export async function sendTestEmail(
   batchId: string
 ): Promise<BatchSendResult> {
   return sendPersonalizedBatch([recipient], template, batchId);
+}
+
+// ─── Live message status fetch (Email Activity Feed) ─────────────────────────
+//
+// Requires the SendGrid Email Activity Feed add-on (or an Advanced plan).
+// Returns null gracefully if the add-on is not enabled (403) or the message
+// is not yet indexed (404), so callers fall back to the webhook-updated HANA row.
+//
+// SendGrid event → DeliveryStatus mapping:
+//   processed  → Processed
+//   delivered  → Delivered
+//   open        → Opened
+//   click       → Clicked
+//   bounce      → Bounced
+//   dropped     → Dropped
+//   spamreport  → Bounced
+//   deferred    → Processed  (transient — treat as still in-flight)
+
+const SG_EVENT_TO_STATUS: Record<string, DeliveryStatus> = {
+  processed:  'Processed',
+  delivered:  'Delivered',
+  open:       'Opened',
+  click:      'Clicked',
+  bounce:     'Bounced',
+  dropped:    'Dropped',
+  spamreport: 'Bounced',
+  deferred:   'Processed',
+};
+
+export async function fetchLiveMessageStatus(
+  sgMessageId: string,
+): Promise<DeliveryStatus | null> {
+  const apiKey = process.env.SENDGRID_API_KEY;
+  if (!apiKey) return null;
+
+  try {
+    const res = await fetch(
+      `https://api.sendgrid.com/v3/messages/${encodeURIComponent(sgMessageId)}`,
+      {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+      },
+    );
+
+    // 403 = add-on not purchased; 404 = not yet indexed — both are non-fatal
+    if (res.status === 403 || res.status === 404) return null;
+    if (!res.ok) {
+      console.warn(`[sendgrid] fetchLiveMessageStatus HTTP ${res.status} for ${sgMessageId}`);
+      return null;
+    }
+
+    const data = await res.json() as {
+      events?: { event_name: string }[];
+      status?: string;
+    };
+
+    // The response includes an `events` array in reverse-chronological order.
+    // Pick the most recent event that maps to a known status.
+    const events = data.events ?? [];
+    for (const ev of events) {
+      const mapped = SG_EVENT_TO_STATUS[ev.event_name?.toLowerCase()];
+      if (mapped) return mapped;
+    }
+
+    // Fallback: use the top-level `status` field if present
+    if (data.status) {
+      const mapped = SG_EVENT_TO_STATUS[data.status.toLowerCase()];
+      if (mapped) return mapped;
+    }
+
+    return null;
+  } catch (e) {
+    console.warn('[sendgrid] fetchLiveMessageStatus error:', e);
+    return null;
+  }
 }
