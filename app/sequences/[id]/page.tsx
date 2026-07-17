@@ -28,6 +28,7 @@ export default function SequenceEditorPage() {
   const [running, setRunning] = useState(false);
   const [runResult, setRunResult] = useState<{ processed: number; emailsSent: number; completed: number; errors: number } | null>(null);
   const [showEnroll, setShowEnroll] = useState(false);
+  const [activeEnrollments, setActiveEnrollments] = useState<number | null>(null);
   const [showAudit, setShowAudit] = useState(false);
   const [auditLogs, setAuditLogs] = useState<SequenceAuditLog[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
@@ -43,6 +44,18 @@ export default function SequenceEditorPage() {
     return unsub;
   }, [router]);
 
+  const fetchEnrollmentCount = useCallback(async () => {
+    if (!idToken || !id) return;
+    try {
+      const res = await fetch(`/api/sequences/${id}/status`, { headers: { Authorization: `Bearer ${idToken}` } });
+      if (res.ok) {
+        const data = await res.json() as { totals: { STATUS: string; CNT: number }[] };
+        const active = data.totals.find((t) => t.STATUS === 'active');
+        setActiveEnrollments(Number(active?.CNT ?? 0));
+      }
+    } catch {/* non-fatal */}
+  }, [idToken, id]);
+
   useEffect(() => {
     if (!idToken || !id) return;
     fetch(`/api/sequences/${id}`, { headers: { Authorization: `Bearer ${idToken}` } })
@@ -53,7 +66,8 @@ export default function SequenceEditorPage() {
       })
       .catch(() => {/* new sequence */})
       .finally(() => setLoading(false));
-  }, [idToken, id]);
+    void fetchEnrollmentCount();
+  }, [idToken, id, fetchEnrollmentCount]);
 
   const handleSave = useCallback(async () => {
     if (!idToken || saving) return;
@@ -134,7 +148,7 @@ export default function SequenceEditorPage() {
         <button onClick={() => setShowEnroll(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 6, border: '1px solid #d1d5db', background: '#f9fafb', color: '#374151', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
           <UsersIcon style={{ width: 13, height: 13 }} /> Enroll Recipients
         </button>
-        <button onClick={() => void handleRun()} disabled={running} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 6, border: 'none', background: running ? '#d1fae5' : '#10b981', color: '#fff', fontSize: 12, fontWeight: 600, cursor: running ? 'not-allowed' : 'pointer' }}>
+        <button onClick={() => void handleRun()} disabled={running || activeEnrollments === 0} title={activeEnrollments === 0 ? 'No active enrollments' : undefined} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 6, border: 'none', background: (running || activeEnrollments === 0) ? '#d1fae5' : '#10b981', color: (running || activeEnrollments === 0) ? '#6b7280' : '#fff', fontSize: 12, fontWeight: 600, cursor: (running || activeEnrollments === 0) ? 'not-allowed' : 'pointer', opacity: activeEnrollments === 0 ? 0.5 : 1 }}>
           <PlayIcon style={{ width: 13, height: 13 }} /> {running ? 'Running…' : 'Run Now'}
         </button>
         <button onClick={() => void handleSave()} disabled={saving} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 6, border: 'none', background: saveDone ? '#10b981' : '#0f52ba', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
@@ -211,7 +225,7 @@ export default function SequenceEditorPage() {
 
       {/* Enroll modal */}
       {showEnroll && idToken && (
-        <EnrollModal sequenceId={id} idToken={idToken} onClose={() => setShowEnroll(false)} />
+        <EnrollModal sequenceId={id} idToken={idToken} onClose={() => { setShowEnroll(false); void fetchEnrollmentCount(); }} />
       )}
     </div>
   );
