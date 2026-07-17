@@ -167,19 +167,31 @@ export default function SequenceEditorPage() {
 
       {/* Execution History panel */}
       <div style={{ flexShrink: 0, borderBottom: '1px solid #e2e8f0', background: '#fff' }}>
-        <button
-          onClick={() => {
-            const next = !showAudit;
-            setShowAudit(next);
-            if (next) void fetchAuditLogs();
-          }}
-          style={{ width: '100%', padding: '6px 16px', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#374151', textAlign: 'left' }}
-        >
-          <span style={{ fontSize: 10, transition: 'transform 0.15s', display: 'inline-block', transform: showAudit ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
-          Execution History
-          {auditLogs.length > 0 && <span style={{ marginLeft: 4, color: '#9ca3af', fontWeight: 400 }}>({auditLogs.length})</span>}
-          {auditLoading && <span style={{ marginLeft: 'auto', color: '#9ca3af', fontWeight: 400 }}>Loading…</span>}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <button
+            onClick={() => {
+              const next = !showAudit;
+              setShowAudit(next);
+              if (next) void fetchAuditLogs();
+            }}
+            style={{ flex: 1, padding: '6px 16px', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#374151', textAlign: 'left' }}
+          >
+            <span style={{ fontSize: 10, transition: 'transform 0.15s', display: 'inline-block', transform: showAudit ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+            Execution History
+            {auditLogs.length > 0 && <span style={{ marginLeft: 4, color: '#9ca3af', fontWeight: 400 }}>({auditLogs.length})</span>}
+            {auditLoading && <span style={{ marginLeft: 8, color: '#9ca3af', fontWeight: 400 }}>Loading…</span>}
+          </button>
+          {showAudit && (
+            <button
+              onClick={() => void fetchAuditLogs()}
+              disabled={auditLoading}
+              title="Refresh engagement counts"
+              style={{ marginRight: 12, padding: '3px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#f8fafc', color: '#6b7280', fontSize: 11, fontWeight: 600, cursor: auditLoading ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}
+            >
+              ↻ Refresh
+            </button>
+          )}
+        </div>
         {showAudit && (
           <div style={{ maxHeight: 240, overflowY: 'auto', borderTop: '1px solid #f1f5f9' }}>
             {auditLogs.length === 0 && !auditLoading ? (
