@@ -34,6 +34,32 @@ function addDuration(base: Date, amount: number, unit: 'minutes' | 'hours' | 'da
   return d;
 }
 
+// ─── Timezone helpers for Time Window node ────────────────────────────────────
+
+function getLocalParts(date: Date, tz: string): { hour: number; day: number } {
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz, hour: 'numeric', weekday: 'short', hour12: false,
+  });
+  const parts = fmt.formatToParts(date);
+  const hour = parseInt(parts.find((p) => p.type === 'hour')?.value ?? '0', 10);
+  const weekdayStr = parts.find((p) => p.type === 'weekday')?.value ?? 'Mon';
+  const weekdayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  return { hour, day: weekdayMap[weekdayStr] ?? 1 };
+}
+
+function nextWindowOpen(now: Date, startHour: number, endHour: number, allowedDays: number[], tz: string): Date {
+  const d = new Date(now);
+  // try up to 8 days ahead to find the next valid window
+  for (let i = 0; i < 8 * 24; i++) {
+    const { hour, day } = getLocalParts(d, tz);
+    if (allowedDays.includes(day) && hour >= startHour && hour < endHour) return d;
+    d.setMinutes(d.getMinutes() + 60); // advance 1 hour at a time
+  }
+  return d;
+}
+
+// ─── Condition evaluator ──────────────────────────────────────────────────────
+
 async function evaluateCondition(
   node: SequenceNode,
   email: string,
@@ -41,16 +67,36 @@ async function evaluateCondition(
 ): Promise<'yes' | 'no'> {
   if (!lastBatchId) return 'no';
   const { field = 'DELIVERY_STATUS', op = 'in', value = [] } = node.data;
-  if (value.length === 0) return 'no';
+  if ((value as string[]).length === 0) return 'no';
 
-  const placeholders = value.map(() => '?').join(', ');
+  const placeholders = (value as string[]).map(() => '?').join(', ');
   const rows = await query<{ CNT: number }>(
     `SELECT COUNT(*) AS CNT FROM RECIPIENT_LOGS
-      WHERE "EMAIL_ADDRESS" = ? AND "BATCH_ID" = ? AND "${field}" IN (${placeholders})`,
-    [email, lastBatchId, ...value],
+      WHERE "EMAIL_ADDRESS" = ? AND "BATCH_ID" = ? AND "${field as string}" IN (${placeholders})`,
+    [email, lastBatchId, ...(value as string[])],
   );
   const matched = Number(rows.rows[0]?.CNT ?? 0) > 0;
   return op === 'not_in' ? (matched ? 'no' : 'yes') : (matched ? 'yes' : 'no');
+}
+
+// Check statuses across ALL batches for this enrollment (used by Exit and Loop)
+async function hasStatusAcrossAllBatches(
+  email: string,
+  sequenceId: string,
+  statuses: string[],
+): Promise<boolean> {
+  if (statuses.length === 0) return false;
+  const placeholders = statuses.map(() => '?').join(', ');
+  const rows = await query<{ CNT: number }>(
+    `SELECT COUNT(*) AS CNT
+       FROM "HATCH"."RECIPIENT_LOGS" RL
+       JOIN "HATCH"."SEQUENCE_ENROLLMENTS" SE
+         ON RL.BATCH_ID = SE.LAST_BATCH_ID
+      WHERE SE.SEQUENCE_ID = ? AND RL."EMAIL_ADDRESS" = ?
+        AND RL."DELIVERY_STATUS" IN (${placeholders})`,
+    [sequenceId, email, ...statuses],
+  );
+  return Number(rows.rows[0]?.CNT ?? 0) > 0;
 }
 
 // ─── Core: advance a single enrollment one step through the flow ──────────────
@@ -78,14 +124,17 @@ export async function advanceEnrollment(
 
   let currentNode = findNode(flow, enrollment.CURRENT_NODE);
   let lastBatchId = enrollment.LAST_BATCH_ID;
-  const recipient: RecipientRow = enrollment.METADATA
-    ? (JSON.parse(enrollment.METADATA) as RecipientRow)
+  let meta: Record<string, unknown> = enrollment.METADATA
+    ? (JSON.parse(enrollment.METADATA) as Record<string, unknown>)
+    : {};
+  const recipient: RecipientRow = meta.EMAIL_ADDRESS
+    ? (meta as unknown as RecipientRow)
     : { EMAIL_ADDRESS: enrollment.EMAIL_ADDRESS, FIRST_NAME: '', LAST_NAME: '', CATEGORY: '', COMPANY: '', PHONE_NUMBER: '', COMMENTS: '' };
 
   const now = new Date();
   let nextRunAt: Date | null = null;
   let completed = false;
-  const sentBatchIds: string[] = [];
+  let metaDirty = false;
 
   while (currentNode) {
     if (currentNode.type === 'end') {
@@ -100,7 +149,6 @@ export async function advanceEnrollment(
 
     if (currentNode.type === 'wait') {
       const { amount = 1, unit = 'days', date } = currentNode.data as { amount?: number; unit?: 'minutes' | 'hours' | 'days'; date?: string | null; days?: number };
-      // support legacy `days` field from older saved flows
       const legacyDays = (currentNode.data as { days?: number }).days;
       nextRunAt = date ? new Date(date) : addDuration(now, amount ?? legacyDays ?? 1, unit);
       currentNode = nextNode(flow, currentNode.id) ?? undefined!;
@@ -123,11 +171,101 @@ export async function advanceEnrollment(
           batchId,
         );
         lastBatchId = batchId;
-        sentBatchIds.push(batchId);
       }
-      // Stop after sending — next node (often a condition) needs async events first
       currentNode = nextNode(flow, currentNode.id) ?? undefined!;
       break;
+    }
+
+    // ── Goal: mark converted and stop ──────────────────────────────────────────
+    if (currentNode.type === 'goal') {
+      meta = { ...meta, goalMet: true, goalName: currentNode.data.goalName ?? '' };
+      metaDirty = true;
+      completed = true;
+      break;
+    }
+
+    // ── Exit: stop if recipient has a terminal status ──────────────────────────
+    if (currentNode.type === 'exit') {
+      const exitOn = (currentNode.data.exitOn as string[] | undefined) ?? ['Bounced', 'Dropped'];
+      const shouldExit = await hasStatusAcrossAllBatches(enrollment.EMAIL_ADDRESS, sequenceId, exitOn);
+      if (shouldExit) {
+        meta = { ...meta, exitReason: exitOn.join(', ') };
+        metaDirty = true;
+        completed = true;
+        break;
+      }
+      currentNode = nextNode(flow, currentNode.id) ?? undefined!;
+      continue;
+    }
+
+    // ── Time Window: hold until within allowed hours/days ─────────────────────
+    if (currentNode.type === 'timeWindow') {
+      const startHour = (currentNode.data.startHour as number | undefined) ?? 9;
+      const endHour   = (currentNode.data.endHour   as number | undefined) ?? 17;
+      const allowedDays = (currentNode.data.allowedDays as number[] | undefined) ?? [1, 2, 3, 4, 5];
+      const tz = (currentNode.data.timezone as string | undefined) ?? 'UTC';
+      const { hour, day } = getLocalParts(now, tz);
+      if (allowedDays.includes(day) && hour >= startHour && hour < endHour) {
+        // Inside window — pass through
+        currentNode = nextNode(flow, currentNode.id) ?? undefined!;
+        continue;
+      }
+      // Outside window — schedule for next open
+      nextRunAt = nextWindowOpen(now, startHour, endHour, allowedDays, tz);
+      // Stay on this node so next run re-checks
+      break;
+    }
+
+    // ── A/B Split: route deterministically per recipient ─────────────────────
+    if (currentNode.type === 'abSplit') {
+      let branch = meta.abBranch as string | undefined;
+      if (!branch) {
+        const pct = (currentNode.data.splitPercent as number | undefined) ?? 50;
+        branch = Math.random() * 100 < pct ? 'a' : 'b';
+        meta = { ...meta, abBranch: branch };
+        metaDirty = true;
+        await query(
+          `UPDATE "HATCH"."SEQUENCE_ENROLLMENTS" SET METADATA = ?, UPDATED_AT = CURRENT_TIMESTAMP WHERE ID = ?`,
+          [JSON.stringify(meta), enrollment.ID],
+        );
+      }
+      currentNode = nextNode(flow, currentNode.id, branch) ?? undefined!;
+      continue;
+    }
+
+    // ── Loop: iterate up to maxIterations, exit when condition met ────────────
+    if (currentNode.type === 'loop') {
+      const max = (currentNode.data.maxIterations as number | undefined) ?? 3;
+      const loopCond = (currentNode.data.loopCondition as string[] | undefined) ?? [];
+      const loopCount = (meta.loopCount as number | undefined) ?? 0;
+
+      // Check exit condition first (if configured)
+      if (loopCond.length > 0) {
+        const condMet = await hasStatusAcrossAllBatches(enrollment.EMAIL_ADDRESS, sequenceId, loopCond);
+        if (condMet) {
+          meta = { ...meta, loopCount: 0 };
+          metaDirty = true;
+          currentNode = nextNode(flow, currentNode.id, 'exit') ?? undefined!;
+          continue;
+        }
+      }
+
+      if (loopCount >= max) {
+        meta = { ...meta, loopCount: 0 };
+        metaDirty = true;
+        currentNode = nextNode(flow, currentNode.id, 'exit') ?? undefined!;
+        continue;
+      }
+
+      meta = { ...meta, loopCount: loopCount + 1 };
+      metaDirty = true;
+      await query(
+        `UPDATE "HATCH"."SEQUENCE_ENROLLMENTS" SET METADATA = ?, UPDATED_AT = CURRENT_TIMESTAMP WHERE ID = ?`,
+        [JSON.stringify(meta), enrollment.ID],
+      );
+      currentNode = nextNode(flow, currentNode.id, 'loop') ?? undefined!;
+      // The loop edge points back to an earlier node — the while loop will continue from there
+      continue;
     }
 
     // Unknown node type — skip
@@ -136,12 +274,14 @@ export async function advanceEnrollment(
 
   if (!currentNode) completed = true;
 
+  const metaJson = metaDirty ? JSON.stringify(meta) : enrollment.METADATA;
+
   if (completed) {
     await query(
       `UPDATE "HATCH"."SEQUENCE_ENROLLMENTS"
-          SET STATUS = 'completed', UPDATED_AT = CURRENT_TIMESTAMP
+          SET STATUS = 'completed', METADATA = ?, UPDATED_AT = CURRENT_TIMESTAMP
         WHERE ID = ?`,
-      [enrollment.ID],
+      [metaJson, enrollment.ID],
     );
     return 'completed';
   }
@@ -150,11 +290,11 @@ export async function advanceEnrollment(
   await query(
     `UPDATE "HATCH"."SEQUENCE_ENROLLMENTS"
         SET CURRENT_NODE = ?, LAST_BATCH_ID = COALESCE(?, LAST_BATCH_ID),
-            NEXT_RUN_AT = ?, UPDATED_AT = CURRENT_TIMESTAMP
+            NEXT_RUN_AT = ?, METADATA = ?, UPDATED_AT = CURRENT_TIMESTAMP
       WHERE ID = ?`,
-    [currentNode?.id ?? enrollment.CURRENT_NODE, lastBatchId, scheduleAt.toISOString(), enrollment.ID],
+    [currentNode?.id ?? enrollment.CURRENT_NODE, lastBatchId, scheduleAt.toISOString(), metaJson, enrollment.ID],
   );
-  return nextRunAt ? 'waiting' : 'waiting';
+  return 'waiting';
 }
 
 // ─── Orchestrator: run all due enrollments for a sequence ─────────────────────

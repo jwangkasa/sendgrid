@@ -177,7 +177,9 @@ export type SendGridEventType =
 
 // ─── Sequence automation types ────────────────────────────────────────────────
 
-export type SequenceNodeType = 'start' | 'email' | 'wait' | 'condition' | 'end';
+export type SequenceNodeType =
+  'start' | 'email' | 'wait' | 'condition' | 'end' |
+  'goal' | 'exit' | 'timeWindow' | 'abSplit' | 'loop';
 export type SequenceStatus = 'draft' | 'active' | 'paused';
 export type EnrollmentStatus = 'active' | 'completed' | 'error';
 
@@ -191,10 +193,26 @@ export interface SequenceNodeData {
   // wait
   days?: number;
   date?: string | null;
+  amount?: number;
+  unit?: 'minutes' | 'hours' | 'days';
   // condition
   field?: 'DELIVERY_STATUS';
   op?: 'in' | 'not_in';
   value?: string[];
+  // goal
+  goalName?: string;
+  // exit
+  exitOn?: string[];
+  // timeWindow
+  startHour?: number;
+  endHour?: number;
+  timezone?: string;
+  allowedDays?: number[];
+  // abSplit
+  splitPercent?: number;
+  // loop
+  maxIterations?: number;
+  loopCondition?: string[];
   // index signature required by React Flow
   [key: string]: unknown;
 }

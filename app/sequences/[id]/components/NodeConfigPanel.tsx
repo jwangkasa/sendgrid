@@ -103,7 +103,10 @@ export function NodeConfigPanel({ node, idToken, onUpdate, onDelete, onClose, on
   const inputStyle: React.CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '7px 10px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13, outline: 'none', fontFamily: 'inherit' };
   const sectionStyle: React.CSSProperties = { padding: '14px 16px', borderBottom: '1px solid #f1f5f9' };
 
-  const nodeTypeColor: Record<string, string> = { start: '#0f52ba', email: '#6366f1', wait: '#d97706', condition: '#16a34a', end: '#6b7280' };
+  const nodeTypeColor: Record<string, string> = {
+    start: '#0f52ba', email: '#6366f1', wait: '#d97706', condition: '#16a34a', end: '#6b7280',
+    goal: '#e11d48', exit: '#64748b', timeWindow: '#0891b2', abSplit: '#7c3aed', loop: '#ea580c',
+  };
   const color = nodeTypeColor[node.type] ?? '#6b7280';
 
   return (
@@ -211,6 +214,117 @@ export function NodeConfigPanel({ node, idToken, onUpdate, onDelete, onClose, on
                   ⇄ Swap YES / NO branches
                 </button>
               )}
+            </div>
+          )}
+
+          {/* GOAL node */}
+          {node.type === 'goal' && (
+            <div style={sectionStyle}>
+              <label style={labelStyle}>Goal Name</label>
+              <input style={inputStyle} value={(d.goalName as string) ?? ''} onChange={(e) => onUpdate(node.id, { goalName: e.target.value })} placeholder="e.g. Registered, Purchased" />
+              <div style={{ marginTop: 8, padding: 8, background: '#fff1f2', borderRadius: 6, fontSize: 10, color: '#9f1239' }}>
+                🎯 When reached, the recipient is marked as converted and removed from the sequence.
+              </div>
+            </div>
+          )}
+
+          {/* EXIT node */}
+          {node.type === 'exit' && (
+            <div style={sectionStyle}>
+              <label style={labelStyle}>Exit if status is…</label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                {['Bounced', 'Dropped', 'Opened', 'Clicked', 'Delivered'].map((s) => {
+                  const active = ((d.exitOn as string[] | undefined) ?? ['Bounced', 'Dropped']).includes(s);
+                  return (
+                    <button key={s} onClick={() => {
+                      const cur = (d.exitOn as string[] | undefined) ?? ['Bounced', 'Dropped'];
+                      onUpdate(node.id, { exitOn: active ? cur.filter((v) => v !== s) : [...cur, s] });
+                    }} style={{ padding: '4px 10px', borderRadius: 20, border: `1px solid ${active ? color : '#d1d5db'}`, background: active ? `${color}15` : '#f9fafb', fontSize: 11, cursor: 'pointer', color: active ? color : '#374151', fontWeight: active ? 700 : 400 }}>
+                      {s}
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{ padding: 8, background: '#f8fafc', borderRadius: 6, fontSize: 10, color: '#475569' }}>
+                🚪 If matched, the recipient is silently removed from the sequence.
+              </div>
+            </div>
+          )}
+
+          {/* TIME WINDOW node */}
+          {node.type === 'timeWindow' && (
+            <div style={sectionStyle}>
+              <label style={labelStyle}>Send window</label>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ ...labelStyle, fontSize: 10 }}>Start hour (0–23)</label>
+                  <input type="number" min={0} max={23} style={inputStyle} value={(d.startHour as number) ?? 9} onChange={(e) => onUpdate(node.id, { startHour: Number(e.target.value) })} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ ...labelStyle, fontSize: 10 }}>End hour (0–23)</label>
+                  <input type="number" min={0} max={23} style={inputStyle} value={(d.endHour as number) ?? 17} onChange={(e) => onUpdate(node.id, { endHour: Number(e.target.value) })} />
+                </div>
+              </div>
+              <label style={labelStyle}>Allowed days</label>
+              <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
+                {['Su','Mo','Tu','We','Th','Fr','Sa'].map((day, i) => {
+                  const active = ((d.allowedDays as number[] | undefined) ?? [1,2,3,4,5]).includes(i);
+                  return (
+                    <button key={day} onClick={() => {
+                      const cur = (d.allowedDays as number[] | undefined) ?? [1,2,3,4,5];
+                      onUpdate(node.id, { allowedDays: active ? cur.filter((v) => v !== i) : [...cur, i].sort() });
+                    }} style={{ flex: 1, padding: '4px 0', borderRadius: 6, border: `1px solid ${active ? color : '#d1d5db'}`, background: active ? `${color}15` : '#f9fafb', fontSize: 10, cursor: 'pointer', color: active ? color : '#9ca3af', fontWeight: active ? 700 : 400 }}>
+                      {day}
+                    </button>
+                  );
+                })}
+              </div>
+              <label style={labelStyle}>Timezone</label>
+              <select style={inputStyle} value={(d.timezone as string) ?? 'UTC'} onChange={(e) => onUpdate(node.id, { timezone: e.target.value })}>
+                {['UTC','Asia/Singapore','Asia/Kuala_Lumpur','Asia/Jakarta','Asia/Bangkok','Asia/Tokyo','Asia/Seoul','Europe/London','America/New_York','America/Los_Angeles'].map((tz) => (
+                  <option key={tz} value={tz}>{tz}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* A/B SPLIT node */}
+          {node.type === 'abSplit' && (
+            <div style={sectionStyle}>
+              <label style={labelStyle}>Branch A percentage</label>
+              <input type="number" min={1} max={99} style={inputStyle} value={(d.splitPercent as number) ?? 50} onChange={(e) => onUpdate(node.id, { splitPercent: Math.min(99, Math.max(1, Number(e.target.value))) })} />
+              <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+                <div style={{ flex: 1, padding: 8, background: '#faf5ff', borderRadius: 6, fontSize: 10, color: '#7c3aed', textAlign: 'center', fontWeight: 700 }}>A — {(d.splitPercent as number) ?? 50}%</div>
+                <div style={{ flex: 1, padding: 8, background: '#f5f3ff', borderRadius: 6, fontSize: 10, color: '#a78bfa', textAlign: 'center', fontWeight: 700 }}>B — {100 - ((d.splitPercent as number) ?? 50)}%</div>
+              </div>
+              <div style={{ marginTop: 8, padding: 8, background: '#faf5ff', borderRadius: 6, fontSize: 10, color: '#6d28d9' }}>
+                ⚡ Each recipient is randomly assigned once and stays on their branch for re-runs.
+              </div>
+            </div>
+          )}
+
+          {/* LOOP node */}
+          {node.type === 'loop' && (
+            <div style={sectionStyle}>
+              <label style={labelStyle}>Max iterations</label>
+              <input type="number" min={1} max={20} style={inputStyle} value={(d.maxIterations as number) ?? 3} onChange={(e) => onUpdate(node.id, { maxIterations: Math.max(1, Number(e.target.value)) })} />
+              <label style={{ ...labelStyle, marginTop: 10 }}>Exit loop if status is… (optional)</label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                {['Opened', 'Clicked', 'Delivered', 'Bounced'].map((s) => {
+                  const active = ((d.loopCondition as string[] | undefined) ?? []).includes(s);
+                  return (
+                    <button key={s} onClick={() => {
+                      const cur = (d.loopCondition as string[] | undefined) ?? [];
+                      onUpdate(node.id, { loopCondition: active ? cur.filter((v) => v !== s) : [...cur, s] });
+                    }} style={{ padding: '4px 10px', borderRadius: 20, border: `1px solid ${active ? color : '#d1d5db'}`, background: active ? `${color}15` : '#f9fafb', fontSize: 11, cursor: 'pointer', color: active ? color : '#374151', fontWeight: active ? 700 : 400 }}>
+                      {s}
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{ padding: 8, background: '#fff7ed', borderRadius: 6, fontSize: 10, color: '#c2410c' }}>
+                ↩ Connect the <strong>Loop</strong> handle back to an earlier node (e.g. Wait). The <strong>Continue</strong> handle goes to the next step after the loop exits.
+              </div>
             </div>
           )}
 
