@@ -38,6 +38,7 @@ import { EventWebhook, EventWebhookHeader } from '@sendgrid/eventwebhook';
 import { FieldValue } from 'firebase-admin/firestore';
 import { execute, query } from '@/lib/db';
 import { getAdminFirestore } from '@/lib/firebase-admin';
+import { advanceEnrollment } from '@/lib/sequenceEngine';
 import type { SendGridWebhookEvent, SendGridEventType, DeliveryStatus } from '@/lib/types';
 
 // ─── Signature verification ───────────────────────────────────────────────────
@@ -199,6 +200,24 @@ async function processEvent(event: SendGridWebhookEvent): Promise<void> {
     await recipientRef.update(update);
   } catch {
     // Firestore update is best-effort — HANA is the source of truth
+  }
+
+  // Advance any sequence enrollments waiting on this open/click event.
+  // RECIPIENT_LOGS is already updated above, so condition nodes will see the new status.
+  if (eventType === 'open' || eventType === 'click') {
+    const fromEmail = process.env.SENDGRID_FROM_EMAIL ?? '';
+    const fromName  = process.env.SENDGRID_FROM_NAME  ?? '';
+    if (fromEmail) {
+      const pending = await query<{ ID: string; SEQUENCE_ID: string }>(
+        `SELECT ID, SEQUENCE_ID FROM "HATCH"."SEQUENCE_ENROLLMENTS"
+          WHERE "LAST_BATCH_ID" = ? AND "EMAIL_ADDRESS" = ? AND "STATUS" = 'active'`,
+        [batchId, email],
+      ).catch(() => null);
+      for (const row of pending?.rows ?? []) {
+        await advanceEnrollment(row.ID, row.SEQUENCE_ID, fromEmail, fromName)
+          .catch((e) => console.error('[webhook] advance enrollment error:', e));
+      }
+    }
   }
 }
 
