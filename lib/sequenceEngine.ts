@@ -89,7 +89,7 @@ export async function runSequence(
       let completed = false;
 
       while (currentNode) {
-        if (currentNode.type === 'end' || !nextNode(flow, currentNode.id)) {
+        if (currentNode.type === 'end') {
           completed = true;
           break;
         }
@@ -140,6 +140,9 @@ export async function runSequence(
         // Unknown node type — skip
         currentNode = nextNode(flow, currentNode.id) ?? undefined!;
       }
+
+      // If the walk ended with no current node, the flow has no more steps
+      if (!currentNode) completed = true;
 
       if (completed) {
         await query(
