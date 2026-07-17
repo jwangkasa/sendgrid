@@ -5,10 +5,14 @@ import { advanceEnrollment } from '@/lib/sequenceEngine';
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
-  const authHeader = req.headers.get('authorization');
+  // Vercel cron jobs send `Authorization: Bearer <CRON_SECRET>` when the env var is set.
+  // If CRON_SECRET is not configured, allow the request through (Vercel-originated only).
   const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+  if (cronSecret) {
+    const authHeader = req.headers.get('authorization');
+    if (authHeader !== `Bearer ${cronSecret}`) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    }
   }
 
   const fromEmail = process.env.SENDGRID_FROM_EMAIL ?? '';

@@ -1,8 +1,20 @@
 'use client';
 import { Handle, Position } from '@xyflow/react';
 
-export function WaitNode({ data, selected }: { data: { days?: number; date?: string | null }; selected?: boolean }) {
-  const label = data.date ? `Until ${data.date}` : `Wait ${data.days ?? 1} day${(data.days ?? 1) !== 1 ? 's' : ''}`;
+export function WaitNode({ data, selected }: { data: { amount?: number; unit?: string; days?: number; date?: string | null }; selected?: boolean }) {
+  let label: string;
+  if (data.date) {
+    label = `Until ${data.date}`;
+  } else if (data.amount !== undefined) {
+    const amt = data.amount;
+    const unit = data.unit ?? 'days';
+    const singular = unit.replace(/s$/, '');
+    label = `Wait ${amt} ${amt === 1 ? singular : unit}`;
+  } else {
+    // legacy days field
+    const d = data.days ?? 1;
+    label = `Wait ${d} day${d !== 1 ? 's' : ''}`;
+  }
   return (
     <div style={{
       background: '#fffbeb',

@@ -141,17 +141,33 @@ export function NodeConfigPanel({ node, idToken, onUpdate, onDelete, onClose, on
             <div style={sectionStyle}>
               <label style={labelStyle}>Wait mode</label>
               <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-                {(['days', 'date'] as const).map((mode) => (
-                  <button key={mode} onClick={() => onUpdate(node.id, mode === 'days' ? { date: null } : { days: undefined })}
+                {(['duration', 'date'] as const).map((mode) => (
+                  <button key={mode} onClick={() => onUpdate(node.id, mode === 'date' ? { date: '' } : { date: null })}
                     style={{ flex: 1, padding: '6px 0', borderRadius: 6, border: `1px solid ${(mode === 'date') === !!d.date ? color : '#e2e8f0'}`, background: (mode === 'date') === !!d.date ? `${color}15` : '#f9fafb', fontSize: 12, cursor: 'pointer', color: (mode === 'date') === !!d.date ? color : '#374151', fontWeight: (mode === 'date') === !!d.date ? 700 : 400 }}>
-                    {mode === 'days' ? 'Wait X days' : 'Specific date'}
+                    {mode === 'duration' ? 'Wait duration' : 'Specific date'}
                   </button>
                 ))}
               </div>
               {!d.date ? (
                 <>
-                  <label style={labelStyle}>Days to wait</label>
-                  <input type="number" min={0} max={365} style={inputStyle} value={d.days ?? 1} onChange={(e) => onUpdate(node.id, { days: Number(e.target.value) })} />
+                  <label style={labelStyle}>Duration</label>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input
+                      type="number" min={1} max={9999}
+                      style={{ ...inputStyle, flex: 1 }}
+                      value={(d as { amount?: number }).amount ?? d.days ?? 1}
+                      onChange={(e) => onUpdate(node.id, { amount: Math.max(1, Number(e.target.value)), days: undefined })}
+                    />
+                    <select
+                      style={{ ...inputStyle, flex: 1 }}
+                      value={(d as { unit?: string }).unit ?? 'days'}
+                      onChange={(e) => onUpdate(node.id, { unit: e.target.value as 'minutes' | 'hours' | 'days' })}
+                    >
+                      <option value="minutes">Minutes</option>
+                      <option value="hours">Hours</option>
+                      <option value="days">Days</option>
+                    </select>
+                  </div>
                 </>
               ) : (
                 <>

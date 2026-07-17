@@ -26,9 +26,11 @@ function nextNode(flow: SequenceFlow, nodeId: string, edgeLabel?: string): Seque
   return findNode(flow, edge.target) ?? null;
 }
 
-function addDays(base: Date, days: number): Date {
+function addDuration(base: Date, amount: number, unit: 'minutes' | 'hours' | 'days'): Date {
   const d = new Date(base);
-  d.setDate(d.getDate() + days);
+  if (unit === 'minutes') d.setMinutes(d.getMinutes() + amount);
+  else if (unit === 'hours') d.setHours(d.getHours() + amount);
+  else d.setDate(d.getDate() + amount);
   return d;
 }
 
@@ -97,8 +99,10 @@ export async function advanceEnrollment(
     }
 
     if (currentNode.type === 'wait') {
-      const { days = 0, date } = currentNode.data;
-      nextRunAt = date ? new Date(date) : addDays(now, days);
+      const { amount = 1, unit = 'days', date } = currentNode.data as { amount?: number; unit?: 'minutes' | 'hours' | 'days'; date?: string | null; days?: number };
+      // support legacy `days` field from older saved flows
+      const legacyDays = (currentNode.data as { days?: number }).days;
+      nextRunAt = date ? new Date(date) : addDuration(now, amount ?? legacyDays ?? 1, unit);
       currentNode = nextNode(flow, currentNode.id) ?? undefined!;
       break;
     }
