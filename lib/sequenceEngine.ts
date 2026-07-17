@@ -128,8 +128,11 @@ export async function runSequence(
             lastBatchId = batchId;
             result.emailsSent++;
           }
+          // Advance pointer past the email node but stop — the next node
+          // (often a condition) must be evaluated on the NEXT run so that
+          // async events (opens, clicks) have time to arrive via webhook.
           currentNode = nextNode(flow, currentNode.id) ?? undefined!;
-          continue;
+          break;
         }
 
         // Unknown node type — skip
