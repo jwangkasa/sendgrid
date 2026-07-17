@@ -150,7 +150,10 @@ export async function advanceEnrollment(
     if (currentNode.type === 'wait') {
       const { amount = 1, unit = 'days', date } = currentNode.data as { amount?: number; unit?: 'minutes' | 'hours' | 'days'; date?: string | null; days?: number };
       const legacyDays = (currentNode.data as { days?: number }).days;
-      nextRunAt = date ? new Date(date) : addDuration(now, amount ?? legacyDays ?? 1, unit);
+      // date-only strings (YYYY-MM-DD) parse as midnight UTC — append end-of-day
+      // so the enrollment fires on the correct calendar day in any timezone
+      const dateTs = date ? new Date(date.length === 10 ? `${date}T23:59:00Z` : date) : null;
+      nextRunAt = dateTs ?? addDuration(now, amount ?? legacyDays ?? 1, unit);
       currentNode = nextNode(flow, currentNode.id) ?? undefined!;
       break;
     }

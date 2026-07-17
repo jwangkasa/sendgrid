@@ -145,14 +145,20 @@ export function NodeConfigPanel({ node, idToken, onUpdate, onDelete, onClose, on
             <div style={sectionStyle}>
               <label style={labelStyle}>Wait mode</label>
               <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-                {(['duration', 'date'] as const).map((mode) => (
-                  <button key={mode} onClick={() => onUpdate(node.id, mode === 'date' ? { date: '' } : { date: null })}
-                    style={{ flex: 1, padding: '6px 0', borderRadius: 6, border: `1px solid ${(mode === 'date') === !!d.date ? color : '#e2e8f0'}`, background: (mode === 'date') === !!d.date ? `${color}15` : '#f9fafb', fontSize: 12, cursor: 'pointer', color: (mode === 'date') === !!d.date ? color : '#374151', fontWeight: (mode === 'date') === !!d.date ? 700 : 400 }}>
-                    {mode === 'duration' ? 'Wait duration' : 'Specific date'}
-                  </button>
-                ))}
+                {(['duration', 'date'] as const).map((mode) => {
+                    const isDateMode = d.date !== null && d.date !== undefined;
+                    const isActive = (mode === 'date') === isDateMode;
+                    const todayPlus1 = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+                    return (
+                      <button key={mode}
+                        onClick={() => onUpdate(node.id, mode === 'date' ? { date: todayPlus1 } : { date: null })}
+                        style={{ flex: 1, padding: '6px 0', borderRadius: 6, border: `1px solid ${isActive ? color : '#e2e8f0'}`, background: isActive ? `${color}15` : '#f9fafb', fontSize: 12, cursor: 'pointer', color: isActive ? color : '#374151', fontWeight: isActive ? 700 : 400 }}>
+                        {mode === 'duration' ? 'Wait duration' : 'Specific date'}
+                      </button>
+                    );
+                  })}
               </div>
-              {!d.date ? (
+              {(d.date === null || d.date === undefined) ? (
                 <>
                   <label style={labelStyle}>Duration</label>
                   <div style={{ display: 'flex', gap: 8 }}>
