@@ -179,7 +179,8 @@ export type SendGridEventType =
 
 export type SequenceNodeType =
   'start' | 'email' | 'wait' | 'condition' | 'end' |
-  'goal' | 'exit' | 'timeWindow' | 'abSplit' | 'loop';
+  'goal' | 'exit' | 'timeWindow' | 'abSplit' | 'loop' |
+  'tag' | 'unsubscribe' | 'sms';
 export type SequenceStatus = 'draft' | 'active' | 'paused';
 export type EnrollmentStatus = 'active' | 'completed' | 'error';
 

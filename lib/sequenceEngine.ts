@@ -268,6 +268,72 @@ export async function advanceEnrollment(
       continue;
     }
 
+    // ── Tag: attach a label to the recipient's enrollment metadata ────────────
+    if (currentNode.type === 'tag') {
+      const tagName = (currentNode.data.tagName as string | undefined)?.trim();
+      if (tagName) {
+        const existingTags = (meta.tags as string[] | undefined) ?? [];
+        if (!existingTags.includes(tagName)) {
+          meta = { ...meta, tags: [...existingTags, tagName] };
+          metaDirty = true;
+        }
+      }
+      currentNode = nextNode(flow, currentNode.id) ?? undefined!;
+      continue;
+    }
+
+    // ── Unsubscribe Check: exit if recipient has any suppression status ───────
+    if (currentNode.type === 'unsubscribe') {
+      const suppressionStatuses = ['Bounced', 'Dropped'];
+      const suppressed = await hasStatusAcrossAllBatches(enrollment.EMAIL_ADDRESS, sequenceId, suppressionStatuses);
+      if (suppressed) {
+        meta = { ...meta, exitReason: 'unsubscribed/suppressed' };
+        metaDirty = true;
+        completed = true;
+        break;
+      }
+      currentNode = nextNode(flow, currentNode.id) ?? undefined!;
+      continue;
+    }
+
+    // ── SMS: send a text message via Twilio (requires env vars) ──────────────
+    if (currentNode.type === 'sms') {
+      const smsBody = (currentNode.data.smsBody as string | undefined)?.trim();
+      const toNumber = recipient.PHONE_NUMBER?.trim();
+      const accountSid = process.env.TWILIO_ACCOUNT_SID;
+      const authToken  = process.env.TWILIO_AUTH_TOKEN;
+      const fromNumber = process.env.TWILIO_FROM_NUMBER;
+
+      if (smsBody && toNumber && accountSid && authToken && fromNumber) {
+        // Personalise merge tags
+        const body = smsBody
+          .replace(/\{\{FIRST_NAME\}\}/g, recipient.FIRST_NAME || '')
+          .replace(/\{\{LAST_NAME\}\}/g,  recipient.LAST_NAME  || '')
+          .replace(/\{\{COMPANY\}\}/g,    recipient.COMPANY    || '');
+
+        try {
+          await fetch(
+            `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
+            {
+              method: 'POST',
+              headers: {
+                Authorization: `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString('base64')}`,
+                'Content-Type': 'application/x-www-form-urlencoded',
+              },
+              body: new URLSearchParams({ To: toNumber, From: fromNumber, Body: body }).toString(),
+            },
+          );
+        } catch (e) {
+          console.error('[sequenceEngine] SMS send error:', e);
+        }
+      } else if (!accountSid || !authToken || !fromNumber) {
+        console.warn('[sequenceEngine] SMS node skipped — Twilio env vars not configured');
+      }
+
+      currentNode = nextNode(flow, currentNode.id) ?? undefined!;
+      break;
+    }
+
     // Unknown node type — skip
     currentNode = nextNode(flow, currentNode.id) ?? undefined!;
   }

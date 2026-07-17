@@ -17,21 +17,29 @@ import { ExitNode } from './nodes/ExitNode';
 import { TimeWindowNode } from './nodes/TimeWindowNode';
 import { AbSplitNode } from './nodes/AbSplitNode';
 import { LoopNode } from './nodes/LoopNode';
+import { EndNode } from './nodes/EndNode';
+import { TagNode } from './nodes/TagNode';
+import { UnsubscribeNode } from './nodes/UnsubscribeNode';
+import { SmsNode } from './nodes/SmsNode';
 import { NodePalette } from './NodePalette';
 import { NodeConfigPanel } from './NodeConfigPanel';
 import type { SequenceNode, SequenceEdge, SequenceFlow } from '@/lib/types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const nodeTypes: NodeTypes = {
-  start:      StartNode as any,
-  email:      EmailNode as any,
-  wait:       WaitNode as any,
-  condition:  ConditionNode as any,
-  goal:       GoalNode as any,
-  exit:       ExitNode as any,
-  timeWindow: TimeWindowNode as any,
-  abSplit:    AbSplitNode as any,
-  loop:       LoopNode as any,
+  start:       StartNode as any,
+  email:       EmailNode as any,
+  wait:        WaitNode as any,
+  condition:   ConditionNode as any,
+  goal:        GoalNode as any,
+  exit:        ExitNode as any,
+  timeWindow:  TimeWindowNode as any,
+  abSplit:     AbSplitNode as any,
+  loop:        LoopNode as any,
+  end:         EndNode as any,
+  tag:         TagNode as any,
+  unsubscribe: UnsubscribeNode as any,
+  sms:         SmsNode as any,
 };
 
 interface Props {
@@ -164,6 +172,7 @@ export function FlowCanvas({ initialFlow, idToken, onChange }: Props) {
             const m: Record<string, string> = {
               start: '#0f52ba', email: '#6366f1', wait: '#d97706', condition: '#16a34a',
               goal: '#e11d48', exit: '#64748b', timeWindow: '#0891b2', abSplit: '#7c3aed', loop: '#ea580c',
+              end: '#475569', tag: '#0d9488', unsubscribe: '#dc2626', sms: '#16a34a',
             };
             return m[n.type ?? ''] ?? '#94a3b8';
           }} />

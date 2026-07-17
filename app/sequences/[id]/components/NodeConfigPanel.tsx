@@ -104,8 +104,9 @@ export function NodeConfigPanel({ node, idToken, onUpdate, onDelete, onClose, on
   const sectionStyle: React.CSSProperties = { padding: '14px 16px', borderBottom: '1px solid #f1f5f9' };
 
   const nodeTypeColor: Record<string, string> = {
-    start: '#0f52ba', email: '#6366f1', wait: '#d97706', condition: '#16a34a', end: '#6b7280',
+    start: '#0f52ba', email: '#6366f1', wait: '#d97706', condition: '#16a34a', end: '#475569',
     goal: '#e11d48', exit: '#64748b', timeWindow: '#0891b2', abSplit: '#7c3aed', loop: '#ea580c',
+    tag: '#0d9488', unsubscribe: '#dc2626', sms: '#16a34a',
   };
   const color = nodeTypeColor[node.type] ?? '#6b7280';
 
@@ -324,6 +325,63 @@ export function NodeConfigPanel({ node, idToken, onUpdate, onDelete, onClose, on
               </div>
               <div style={{ padding: 8, background: '#fff7ed', borderRadius: 6, fontSize: 10, color: '#c2410c' }}>
                 ↩ Connect the <strong>Loop</strong> handle back to an earlier node (e.g. Wait). The <strong>Continue</strong> handle goes to the next step after the loop exits.
+              </div>
+            </div>
+          )}
+
+          {/* END node */}
+          {node.type === 'end' && (
+            <div style={sectionStyle}>
+              <div style={{ padding: 8, background: '#f1f5f9', borderRadius: 6, fontSize: 10, color: '#475569' }}>
+                🏁 This node terminates the sequence for the recipient. No further steps will run after this point.
+              </div>
+            </div>
+          )}
+
+          {/* TAG node */}
+          {node.type === 'tag' && (
+            <div style={sectionStyle}>
+              <label style={labelStyle}>Tag Name</label>
+              <input
+                style={inputStyle}
+                value={(d.tagName as string) ?? ''}
+                onChange={(e) => onUpdate(node.id, { tagName: e.target.value })}
+                placeholder="e.g. Hot Lead, Interested, Webinar Attended"
+              />
+              <div style={{ marginTop: 8, padding: 8, background: '#f0fdfa', borderRadius: 6, fontSize: 10, color: '#0f766e' }}>
+                🏷 The tag is stored in the enrollment metadata and can be used to segment recipients later.
+              </div>
+            </div>
+          )}
+
+          {/* UNSUBSCRIBE CHECK node */}
+          {node.type === 'unsubscribe' && (
+            <div style={sectionStyle}>
+              <div style={{ padding: 8, background: '#fff5f5', borderRadius: 6, fontSize: 10, color: '#991b1b' }}>
+                🚫 Checks if the recipient has a <strong>spamreport</strong>, <strong>Bounced</strong>, or <strong>Dropped</strong> status across any previous campaign batch. If matched, the enrollment is silently exited — no further emails are sent.
+              </div>
+              <div style={{ marginTop: 8, padding: 8, background: '#fef2f2', borderRadius: 6, fontSize: 10, color: '#b91c1c' }}>
+                Place this node before each email step to ensure CAN-SPAM / GDPR compliance.
+              </div>
+            </div>
+          )}
+
+          {/* SMS node */}
+          {node.type === 'sms' && (
+            <div style={sectionStyle}>
+              <label style={labelStyle}>Message Body</label>
+              <textarea
+                rows={4}
+                style={{ ...inputStyle, resize: 'vertical', fontSize: 12 }}
+                value={(d.smsBody as string) ?? ''}
+                onChange={(e) => onUpdate(node.id, { smsBody: e.target.value })}
+                placeholder="e.g. Hi {{FIRST_NAME}}, just a quick reminder about our offer…"
+              />
+              <div style={{ marginTop: 4, fontSize: 10, color: '#6b7280' }}>
+                Use <code>{'{{FIRST_NAME}}'}</code>, <code>{'{{LAST_NAME}}'}</code>, <code>{'{{COMPANY}}'}</code> as merge tags.
+              </div>
+              <div style={{ marginTop: 8, padding: 8, background: '#fefce8', borderRadius: 6, fontSize: 10, color: '#854d0e' }}>
+                ⚠ SMS sending requires a Twilio account. Add <code>TWILIO_ACCOUNT_SID</code>, <code>TWILIO_AUTH_TOKEN</code>, and <code>TWILIO_FROM_NUMBER</code> to your environment variables to enable sending.
               </div>
             </div>
           )}

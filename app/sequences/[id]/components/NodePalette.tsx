@@ -1,14 +1,18 @@
 'use client';
 
 const NODE_TYPES = [
-  { type: 'email',      label: 'Email',       icon: '✉',  color: '#6366f1', desc: 'Send an email' },
-  { type: 'wait',       label: 'Wait',        icon: '⏱',  color: '#d97706', desc: 'Delay before next step' },
-  { type: 'condition',  label: 'Condition',   icon: '⋔',  color: '#16a34a', desc: 'Branch on engagement' },
-  { type: 'goal',       label: 'Goal',        icon: '🎯', color: '#e11d48', desc: 'Mark as converted' },
-  { type: 'exit',       label: 'Exit Check',  icon: '🚪', color: '#64748b', desc: 'Stop if bounced/unsub' },
-  { type: 'timeWindow', label: 'Time Window', icon: '🕐', color: '#0891b2', desc: 'Send in business hours' },
-  { type: 'abSplit',    label: 'A/B Split',   icon: '⚡', color: '#7c3aed', desc: 'Split into two branches' },
-  { type: 'loop',       label: 'Loop',        icon: '↩',  color: '#ea580c', desc: 'Repeat until condition' },
+  { type: 'email',       label: 'Email',           icon: '✉',  color: '#6366f1', desc: 'Send an email' },
+  { type: 'sms',         label: 'SMS',             icon: '💬', color: '#16a34a', desc: 'Send a text message' },
+  { type: 'wait',        label: 'Wait',            icon: '⏱',  color: '#d97706', desc: 'Delay before next step' },
+  { type: 'condition',   label: 'Condition',       icon: '⋔',  color: '#16a34a', desc: 'Branch on engagement' },
+  { type: 'tag',         label: 'Tag',             icon: '🏷', color: '#0d9488', desc: 'Label a recipient' },
+  { type: 'unsubscribe', label: 'Unsub Check',     icon: '🚫', color: '#dc2626', desc: 'Exit if unsubscribed' },
+  { type: 'goal',        label: 'Goal',            icon: '🎯', color: '#e11d48', desc: 'Mark as converted' },
+  { type: 'exit',        label: 'Exit Check',      icon: '🚪', color: '#64748b', desc: 'Stop if bounced/unsub' },
+  { type: 'timeWindow',  label: 'Time Window',     icon: '🕐', color: '#0891b2', desc: 'Send in business hours' },
+  { type: 'abSplit',     label: 'A/B Split',       icon: '⚡', color: '#7c3aed', desc: 'Split into two branches' },
+  { type: 'loop',        label: 'Loop',            icon: '↩',  color: '#ea580c', desc: 'Repeat until condition' },
+  { type: 'end',         label: 'End',             icon: '🏁', color: '#475569', desc: 'Terminate sequence' },
 ];
 
 export function NodePalette() {
