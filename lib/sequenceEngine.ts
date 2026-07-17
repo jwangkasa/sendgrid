@@ -57,6 +57,7 @@ export async function runSequence(
   fromName: string,
 ): Promise<SequenceRunResult> {
   const result: SequenceRunResult = { processed: 0, emailsSent: 0, completed: 0, errors: 0 };
+  const sentBatchIds: string[] = [];
 
   // Load sequence
   const seqRows = await query<{ FLOW_JSON: string }>(
@@ -126,6 +127,7 @@ export async function runSequence(
               batchId,
             );
             lastBatchId = batchId;
+            sentBatchIds.push(batchId);
             result.emailsSent++;
           }
           // Advance pointer past the email node but stop — the next node
@@ -165,11 +167,26 @@ export async function runSequence(
     }
   }
 
+  // Aggregate opens/clicks for all batches sent this run
+  let opens = 0;
+  let clicks = 0;
+  if (sentBatchIds.length > 0) {
+    const placeholders = sentBatchIds.map(() => '?').join(', ');
+    const engagement = await query<{ OPENS: number; CLICKS: number }>(
+      `SELECT SUM(OPEN_COUNT) AS OPENS, SUM(CLICK_COUNT) AS CLICKS
+         FROM "HATCH"."RECIPIENT_LOGS"
+        WHERE BATCH_ID IN (${placeholders})`,
+      sentBatchIds,
+    ).catch(() => null);
+    opens = Number(engagement?.rows[0]?.OPENS ?? 0);
+    clicks = Number(engagement?.rows[0]?.CLICKS ?? 0);
+  }
+
   await query(
     `INSERT INTO "HATCH"."SEQUENCE_AUDIT_LOGS"
-       (ID, SEQUENCE_ID, RAN_AT, PROCESSED, EMAILS_SENT, COMPLETED, ERRORS)
-     VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?)`,
-    [uuidv4(), sequenceId, result.processed, result.emailsSent, result.completed, result.errors],
+       (ID, SEQUENCE_ID, RAN_AT, PROCESSED, EMAILS_SENT, COMPLETED, ERRORS, OPENS, CLICKS)
+     VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, ?)`,
+    [uuidv4(), sequenceId, result.processed, result.emailsSent, result.completed, result.errors, opens, clicks],
   ).catch(() => {/* non-fatal */});
 
   return result;

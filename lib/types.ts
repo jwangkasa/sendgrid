@@ -257,4 +257,6 @@ export interface SequenceAuditLog {
   emailsSent: number;
   completed: number;
   errors: number;
+  opens: number;
+  clicks: number;
 }

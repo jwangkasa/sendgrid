@@ -12,6 +12,8 @@ interface AuditRow {
   EMAILS_SENT: number;
   COMPLETED: number;
   ERRORS: number;
+  OPENS: number;
+  CLICKS: number;
 }
 
 export async function GET(req: NextRequest, ctx: Ctx) {
@@ -22,7 +24,7 @@ export async function GET(req: NextRequest, ctx: Ctx) {
 
   try {
     const rows = await query<AuditRow>(
-      `SELECT TOP 50 ID, SEQUENCE_ID, RAN_AT, PROCESSED, EMAILS_SENT, COMPLETED, ERRORS
+      `SELECT TOP 50 ID, SEQUENCE_ID, RAN_AT, PROCESSED, EMAILS_SENT, COMPLETED, ERRORS, OPENS, CLICKS
          FROM "HATCH"."SEQUENCE_AUDIT_LOGS"
         WHERE SEQUENCE_ID = ?
         ORDER BY RAN_AT DESC`,
@@ -37,6 +39,8 @@ export async function GET(req: NextRequest, ctx: Ctx) {
       emailsSent: r.EMAILS_SENT,
       completed: r.COMPLETED,
       errors: r.ERRORS,
+      opens: Number(r.OPENS ?? 0),
+      clicks: Number(r.CLICKS ?? 0),
     }));
 
     return NextResponse.json({ logs });

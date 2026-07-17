@@ -174,7 +174,7 @@ export default function SequenceEditorPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                 <thead>
                   <tr style={{ background: '#f8fafc', position: 'sticky', top: 0 }}>
-                    {['Ran At', 'Processed', 'Emails Sent', 'Completed', 'Errors'].map((h) => (
+                    {['Ran At', 'Processed', 'Emails Sent', 'Opened', 'Clicked', 'Completed', 'Errors'].map((h) => (
                       <th key={h} style={{ padding: '6px 12px', textAlign: h === 'Ran At' ? 'left' : 'center', fontWeight: 700, color: '#6b7280', fontSize: 10, letterSpacing: '0.04em', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
@@ -187,6 +187,8 @@ export default function SequenceEditorPage() {
                       </td>
                       <td style={{ padding: '6px 12px', textAlign: 'center', color: '#374151' }}>{log.processed}</td>
                       <td style={{ padding: '6px 12px', textAlign: 'center', color: '#374151' }}>{log.emailsSent}</td>
+                      <td style={{ padding: '6px 12px', textAlign: 'center', fontWeight: log.opens > 0 ? 700 : 400, color: log.opens > 0 ? '#0f52ba' : '#374151' }}>{log.opens}</td>
+                      <td style={{ padding: '6px 12px', textAlign: 'center', fontWeight: log.clicks > 0 ? 700 : 400, color: log.clicks > 0 ? '#7c3aed' : '#374151' }}>{log.clicks}</td>
                       <td style={{ padding: '6px 12px', textAlign: 'center', color: '#374151' }}>{log.completed}</td>
                       <td style={{ padding: '6px 12px', textAlign: 'center', fontWeight: log.errors > 0 ? 700 : 400, color: log.errors > 0 ? '#d97706' : '#374151' }}>{log.errors}</td>
                     </tr>
