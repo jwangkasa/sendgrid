@@ -4,8 +4,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { firebaseAuth as auth } from "@/lib/firebase-client";
 import { onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
-import { FlowCanvas } from './components/FlowCanvas';
-import { ChevronLeftIcon, SaveIcon, PlayIcon, UsersIcon, CheckIcon, UploadCloudIcon } from 'lucide-react';
+import { FlowCanvas, type FlowCanvasHandle } from './components/FlowCanvas';
+import { ChevronLeftIcon, SaveIcon, PlayIcon, UsersIcon, CheckIcon, UploadCloudIcon, Undo2Icon, Redo2Icon, DownloadIcon } from 'lucide-react';
 import type { SequenceFlow, RecipientRow, SequenceAuditLog } from '@/lib/types';
 import { AppNav } from '@/app/components/AppNav';
 import * as XLSX from 'xlsx';
@@ -33,6 +33,10 @@ export default function SequenceEditorPage() {
   const [auditLogs, setAuditLogs] = useState<SequenceAuditLog[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
   const flowRef = useRef<SequenceFlow>(DEFAULT_FLOW);
+  const canvasRef = useRef<FlowCanvasHandle>(null);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+  const jsonUploadRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
@@ -117,6 +121,35 @@ export default function SequenceEditorPage() {
     }
   }, [idToken, id, running, fetchAuditLogs]);
 
+  function handleDownloadJson() {
+    const blob = new Blob([JSON.stringify(flowRef.current, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${name.replace(/\s+/g, '_') || 'sequence'}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function handleUploadJson(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const parsed = JSON.parse(ev.target?.result as string) as SequenceFlow;
+        if (!Array.isArray(parsed.nodes) || !Array.isArray(parsed.edges)) throw new Error('invalid');
+        setFlow(parsed);
+        flowRef.current = parsed;
+        canvasRef.current?.resetFlow(parsed);
+      } catch {
+        alert('Invalid JSON template file.');
+      }
+    };
+    reader.readAsText(file);
+  }
+
   async function handleSignOut() {
     await firebaseSignOut(auth);
     router.push('/login');
@@ -148,6 +181,21 @@ export default function SequenceEditorPage() {
         <button onClick={() => setShowEnroll(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 6, border: '1px solid #d1d5db', background: '#f9fafb', color: '#374151', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
           <UsersIcon style={{ width: 13, height: 13 }} /> Enroll Recipients
         </button>
+        <div style={{ width: 1, height: 20, background: '#e2e8f0' }} />
+        <button onClick={() => canvasRef.current?.undo()} disabled={!canUndo} title="Undo (Ctrl+Z)" style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 10px', borderRadius: 6, border: '1px solid #d1d5db', background: '#f9fafb', color: canUndo ? '#374151' : '#9ca3af', fontSize: 12, fontWeight: 600, cursor: canUndo ? 'pointer' : 'not-allowed', opacity: canUndo ? 1 : 0.5 }}>
+          <Undo2Icon style={{ width: 13, height: 13 }} /> Undo
+        </button>
+        <button onClick={() => canvasRef.current?.redo()} disabled={!canRedo} title="Redo (Ctrl+Y)" style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 10px', borderRadius: 6, border: '1px solid #d1d5db', background: '#f9fafb', color: canRedo ? '#374151' : '#9ca3af', fontSize: 12, fontWeight: 600, cursor: canRedo ? 'pointer' : 'not-allowed', opacity: canRedo ? 1 : 0.5 }}>
+          <Redo2Icon style={{ width: 13, height: 13 }} /> Redo
+        </button>
+        <div style={{ width: 1, height: 20, background: '#e2e8f0' }} />
+        <button onClick={handleDownloadJson} title="Download flow as JSON" style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 10px', borderRadius: 6, border: '1px solid #d1d5db', background: '#f9fafb', color: '#374151', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+          <DownloadIcon style={{ width: 13, height: 13 }} /> JSON
+        </button>
+        <button onClick={() => jsonUploadRef.current?.click()} title="Upload JSON template" style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 10px', borderRadius: 6, border: '1px solid #d1d5db', background: '#f9fafb', color: '#374151', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+          <UploadCloudIcon style={{ width: 13, height: 13 }} /> Upload
+        </button>
+        <input ref={jsonUploadRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleUploadJson} />
         <button onClick={() => void handleRun()} disabled={running || activeEnrollments === 0} title={activeEnrollments === 0 ? 'No active enrollments' : undefined} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 6, border: 'none', background: (running || activeEnrollments === 0) ? '#d1fae5' : '#10b981', color: (running || activeEnrollments === 0) ? '#6b7280' : '#fff', fontSize: 12, fontWeight: 600, cursor: (running || activeEnrollments === 0) ? 'not-allowed' : 'pointer', opacity: activeEnrollments === 0 ? 0.5 : 1 }}>
           <PlayIcon style={{ width: 13, height: 13 }} /> {running ? 'Running…' : 'Run Now'}
         </button>
@@ -229,9 +277,11 @@ export default function SequenceEditorPage() {
       {/* Canvas */}
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
         <FlowCanvas
+          ref={canvasRef}
           initialFlow={flow}
           idToken={idToken}
           onChange={(f) => { flowRef.current = f; }}
+          onHistoryChange={(u, r) => { setCanUndo(u); setCanRedo(r); }}
         />
       </div>
 

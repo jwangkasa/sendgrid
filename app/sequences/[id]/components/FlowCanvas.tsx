@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useImperativeHandle, useRef, useState, forwardRef } from 'react';
 import {
   ReactFlow, Background, Controls, MiniMap,
   addEdge, useNodesState, useEdgesState,
@@ -23,7 +23,7 @@ import { UnsubscribeNode } from './nodes/UnsubscribeNode';
 import { SmsNode } from './nodes/SmsNode';
 import { NodePalette } from './NodePalette';
 import { NodeConfigPanel } from './NodeConfigPanel';
-import type { SequenceNode, SequenceEdge, SequenceFlow } from '@/lib/types';
+import type { SequenceNode, SequenceFlow } from '@/lib/types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const nodeTypes: NodeTypes = {
@@ -42,27 +42,59 @@ const nodeTypes: NodeTypes = {
   sms:         SmsNode as any,
 };
 
+export interface FlowCanvasHandle {
+  undo: () => void;
+  redo: () => void;
+  resetFlow: (flow: SequenceFlow) => void;
+}
+
 interface Props {
   initialFlow: SequenceFlow;
   idToken: string | null;
   onChange: (flow: SequenceFlow) => void;
+  onHistoryChange?: (canUndo: boolean, canRedo: boolean) => void;
 }
 
-export function FlowCanvas({ initialFlow, idToken, onChange }: Props) {
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node>(
-    initialFlow.nodes.map((n) => ({ id: n.id, type: n.type, position: n.position, data: n.data })),
-  );
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(
-    initialFlow.edges.map((e) => ({
-      id: e.id, source: e.source, target: e.target,
-      sourceHandle: e.sourceHandle ?? undefined,
-      label: e.label,
-      style: e.label === 'no' ? { stroke: '#dc2626' } : e.label === 'yes' ? { stroke: '#16a34a' } : undefined,
-    })),
-  );
+type Snapshot = { nodes: Node[]; edges: Edge[] };
+
+function toRfNodes(ns: SequenceFlow['nodes']): Node[] {
+  return ns.map((n) => ({ id: n.id, type: n.type, position: n.position, data: n.data as Record<string, unknown> }));
+}
+
+function toRfEdges(es: SequenceFlow['edges']): Edge[] {
+  return es.map((e) => ({
+    id: e.id, source: e.source, target: e.target,
+    sourceHandle: e.sourceHandle ?? undefined,
+    label: e.label,
+    style: e.label === 'no' ? { stroke: '#dc2626' } : e.label === 'yes' ? { stroke: '#16a34a' } : undefined,
+  }));
+}
+
+export const FlowCanvas = forwardRef<FlowCanvasHandle, Props>(function FlowCanvas(
+  { initialFlow, idToken, onChange, onHistoryChange },
+  ref,
+) {
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>(toRfNodes(initialFlow.nodes));
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(toRfEdges(initialFlow.edges));
   const [selectedNode, setSelectedNode] = useState<SequenceNode | null>(null);
   const rfInstance = useRef<ReactFlowInstance | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const historyRef = useRef<Snapshot[]>([{ nodes: toRfNodes(initialFlow.nodes), edges: toRfEdges(initialFlow.edges) }]);
+  const historyIndexRef = useRef(0);
+  const skipHistoryRef = useRef(false);
+
+  const notifyHistory = useCallback(() => {
+    onHistoryChange?.(historyIndexRef.current > 0, historyIndexRef.current < historyRef.current.length - 1);
+  }, [onHistoryChange]);
+
+  const pushHistory = useCallback((ns: Node[], es: Edge[]) => {
+    if (skipHistoryRef.current) return;
+    historyRef.current = historyRef.current.slice(0, historyIndexRef.current + 1);
+    historyRef.current.push({ nodes: ns, edges: es });
+    historyIndexRef.current = historyRef.current.length - 1;
+    notifyHistory();
+  }, [notifyHistory]);
 
   const emitChange = useCallback((ns: Node[], es: Edge[]) => {
     onChange({
@@ -70,6 +102,43 @@ export function FlowCanvas({ initialFlow, idToken, onChange }: Props) {
       edges: es.map((e) => ({ id: e.id, source: e.source, target: e.target, sourceHandle: e.sourceHandle ?? null, label: e.label as string | undefined })),
     });
   }, [onChange]);
+
+  const restoreSnapshot = useCallback((snap: Snapshot) => {
+    skipHistoryRef.current = true;
+    setNodes(snap.nodes);
+    setEdges(snap.edges);
+    setSelectedNode(null);
+    emitChange(snap.nodes, snap.edges);
+    skipHistoryRef.current = false;
+  }, [setNodes, setEdges, emitChange]);
+
+  useImperativeHandle(ref, () => ({
+    undo() {
+      if (historyIndexRef.current <= 0) return;
+      historyIndexRef.current -= 1;
+      restoreSnapshot(historyRef.current[historyIndexRef.current]!);
+      notifyHistory();
+    },
+    redo() {
+      if (historyIndexRef.current >= historyRef.current.length - 1) return;
+      historyIndexRef.current += 1;
+      restoreSnapshot(historyRef.current[historyIndexRef.current]!);
+      notifyHistory();
+    },
+    resetFlow(flow: SequenceFlow) {
+      const ns = toRfNodes(flow.nodes);
+      const es = toRfEdges(flow.edges);
+      skipHistoryRef.current = true;
+      setNodes(ns);
+      setEdges(es);
+      setSelectedNode(null);
+      emitChange(ns, es);
+      historyRef.current = [{ nodes: ns, edges: es }];
+      historyIndexRef.current = 0;
+      skipHistoryRef.current = false;
+      notifyHistory();
+    },
+  }), [restoreSnapshot, notifyHistory, setNodes, setEdges, emitChange]);
 
   const onConnect = useCallback((connection: Connection) => {
     const label = connection.sourceHandle === 'yes' ? 'yes' : connection.sourceHandle === 'no' ? 'no' : undefined;
@@ -80,10 +149,11 @@ export function FlowCanvas({ initialFlow, idToken, onChange }: Props) {
         label,
         style: label === 'no' ? { stroke: '#dc2626' } : label === 'yes' ? { stroke: '#16a34a' } : undefined,
       }, eds);
+      pushHistory(nodes, newEdges);
       emitChange(nodes, newEdges);
       return newEdges;
     });
-  }, [setEdges, emitChange, nodes]);
+  }, [setEdges, emitChange, pushHistory, nodes]);
 
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -96,10 +166,11 @@ export function FlowCanvas({ initialFlow, idToken, onChange }: Props) {
     const newNode: Node = { id, type, position, data: { label: type.charAt(0).toUpperCase() + type.slice(1) } };
     setNodes((nds) => {
       const next = [...nds, newNode];
+      pushHistory(next, edges);
       emitChange(next, edges);
       return next;
     });
-  }, [setNodes, emitChange, edges]);
+  }, [setNodes, emitChange, pushHistory, edges]);
 
   const onDragOver = (e: React.DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; };
 
@@ -110,24 +181,26 @@ export function FlowCanvas({ initialFlow, idToken, onChange }: Props) {
   const handleUpdateNodeData = useCallback((id: string, patch: Partial<SequenceNode['data']>) => {
     setNodes((nds) => {
       const next = nds.map((n) => n.id === id ? { ...n, data: { ...n.data, ...patch } } : n);
+      pushHistory(next, edges);
       emitChange(next, edges);
       return next;
     });
     setSelectedNode((prev) => prev?.id === id ? { ...prev, data: { ...prev.data, ...patch } } : prev);
-  }, [setNodes, emitChange, edges]);
+  }, [setNodes, emitChange, pushHistory, edges]);
 
   const handleDeleteNode = useCallback((id: string) => {
     setNodes((nds) => {
       const next = nds.filter((n) => n.id !== id);
       setEdges((eds) => {
         const nextEdges = eds.filter((e) => e.source !== id && e.target !== id);
+        pushHistory(next, nextEdges);
         emitChange(next, nextEdges);
         return nextEdges;
       });
       return next;
     });
     setSelectedNode(null);
-  }, [setNodes, setEdges, emitChange]);
+  }, [setNodes, setEdges, emitChange, pushHistory]);
 
   const handleSwapBranches = useCallback((id: string) => {
     setEdges((eds) => {
@@ -140,10 +213,11 @@ export function FlowCanvas({ initialFlow, idToken, onChange }: Props) {
           style: newLabel === 'no' ? { stroke: '#dc2626' } : newLabel === 'yes' ? { stroke: '#16a34a' } : e.style,
         };
       });
+      pushHistory(nodes, next);
       emitChange(nodes, next);
       return next;
     });
-  }, [setEdges, emitChange, nodes]);
+  }, [setEdges, emitChange, pushHistory, nodes]);
 
   return (
     <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
@@ -155,7 +229,6 @@ export function FlowCanvas({ initialFlow, idToken, onChange }: Props) {
           nodeTypes={nodeTypes}
           onNodesChange={(changes) => {
             onNodesChange(changes);
-            // emit on position changes
             setNodes((nds) => { emitChange(nds, edges); return nds; });
           }}
           onEdgesChange={onEdgesChange}
@@ -178,7 +251,6 @@ export function FlowCanvas({ initialFlow, idToken, onChange }: Props) {
           }} />
         </ReactFlow>
 
-        {/* Empty state hint */}
         {nodes.length <= 1 && (
           <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', pointerEvents: 'none', textAlign: 'center', color: '#94a3b8', fontFamily: 'Inter,Arial,sans-serif' }}>
             <div style={{ fontSize: 32, marginBottom: 8 }}>⋔</div>
@@ -200,4 +272,4 @@ export function FlowCanvas({ initialFlow, idToken, onChange }: Props) {
       )}
     </div>
   );
-}
+});
